@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES6",
+    "target": "ES5",
     "experimentalDecorators": false,
     "esModuleInterop": true,
-    "module": "ES6",
+    "module": "commonjs",
     "moduleResolution": "node",
     "noUnusedLocals": true,
     "sourceMap": true,

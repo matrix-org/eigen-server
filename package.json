@@ -6,10 +6,12 @@
   "repository": "git@github.com:matrix-org/linearized-matrix.git",
   "author": "The Matrix.org Foundation C.I.C.",
   "private": true,
-  "type": "module",
   "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/express-ws": "^3.0.1",
     "@types/inquirer": "^9.0.3",
     "@types/node": "^18",
+    "@types/ws": "^8.5.4",
     "husky": "^8.0.3",
     "jest": "^29.5.0",
     "prettier": "^2.8.7",
@@ -26,9 +28,13 @@
     "format": "prettier --config .prettierrc \"{src,test}/**/*.ts\" --write",
     "lint": "tsc -p tsconfig.json --noEmit && prettier --config .prettierrc \"{src,test}/**/*.ts\" --check",
     "dev:client": "yarn build && node build/client/index.js",
+    "dev:client:nobuild": "node build/client/index.js",
     "dev:server": "yarn build && node build/server/index.js"
   },
   "dependencies": {
-    "inquirer": "^9.1.5"
+    "express": "^4.18.2",
+    "express-ws": "^5.0.2",
+    "inquirer": "^8",
+    "ws": "^8.13.0"
   }
 }
