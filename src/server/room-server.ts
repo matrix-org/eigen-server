@@ -1,10 +1,10 @@
-import {createRoom, Room} from "../models/room";
+import {Room} from "../models/Room";
 
 export class RoomServer {
     private rooms: Room[] = []; // TODO: Persist
 
     public createRoom(creator: string): Room {
-        const room = createRoom(creator);
+        const room = Room.create(creator);
         this.rooms.push(room);
         return room;
     }

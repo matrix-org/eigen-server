@@ -17,6 +17,16 @@ export interface MatrixEvent {
     };
 }
 
+export interface StateEvent extends MatrixEvent {
+    state_key: string;
+}
+
+export interface ClientFriendlyMatrixEvent
+    extends Omit<
+        MatrixEvent,
+        "original_authorized_sending_server" | "authorized_sending_server" | "hashes" | "signatures"
+    > {}
+
 export interface V4PDU extends MatrixEvent {
     auth_events: string[];
     depth: number;

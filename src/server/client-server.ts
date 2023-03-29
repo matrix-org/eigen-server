@@ -14,8 +14,9 @@ import {
     SendPacket,
 } from "../client-server-api/packets";
 import expressWs from "express-ws";
-import {Room} from "../models/room";
+import {Room} from "../models/Room";
 import {RoomServer} from "./room-server";
+import {MatrixEvent} from "../models/event";
 
 interface ChatClient {
     ws: WebSocket;
@@ -61,7 +62,7 @@ export class ClientServerApi {
     }
 
     private sendToClients(room: Room, packet: Packet) {
-        const userIds = [...room.joined];
+        const userIds = room.joinedUserIds;
         for (const client of this.clients) {
             if (userIds.includes(client.userId)) {
                 this.sendToClient(client, packet);
@@ -69,14 +70,43 @@ export class ClientServerApi {
         }
     }
 
+    private sendEventsToClients(room: Room, events: MatrixEvent[]) {
+        const userIds = room.joinedUserIds;
+        for (const client of this.clients) {
+            if (userIds.includes(client.userId)) {
+                for (const event of events) {
+                    this.sendEventToClient(client, event);
+                }
+            }
+        }
+    }
+
+    private sendEventToClient(client: ChatClient, event: MatrixEvent) {
+        if (event.type === "m.room.member") {
+            const membership = event.content["membership"];
+            if (membership === "join") {
+                this.sendToClient(client, {
+                    type: PacketType.RoomJoined,
+                    roomId: event.room_id,
+                    targetUserId: event.state_key,
+                } as RoomJoinedPacket);
+                return; // skip remaining processing
+            } else if (membership === "invite") {
+                this.sendToClient(client, {
+                    type: PacketType.RoomInvited,
+                    roomId: event.room_id,
+                    targetUserId: event.state_key,
+                } as RoomInvitedPacket);
+                return; // skip remaining processing
+            }
+        }
+        this.sendToClient(client, {type: PacketType.Event, event: event} as EventPacket);
+    }
+
     private userCreateRoom(client: ChatClient) {
         const room = this.roomServer.createRoom(client.userId);
-        this.sendToClient(client, {
-            type: PacketType.RoomJoined,
-            roomId: room.roomId,
-            targetUserId: client.userId,
-        } as RoomJoinedPacket);
         console.log(`${client.userId} | Room created: ${room.roomId}`);
+        this.sendEventsToClients(room, room.orderedEvents);
     }
 
     private userJoinRoom(client: ChatClient, packet: JoinPacket) {
@@ -89,12 +119,16 @@ export class ClientServerApi {
             } as ErrorPacket);
         } else {
             try {
-                room.join(client.userId);
-                this.sendToClients(room, {
-                    type: PacketType.RoomJoined,
-                    roomId: room.roomId,
-                    targetUserId: client.userId,
-                } as RoomJoinedPacket);
+                const membershipEvent = room.joinHelper(client.userId);
+                if (!membershipEvent) {
+                    this.sendToClient(client, {
+                        type: PacketType.Error,
+                        message: "Unable to join room",
+                        originalPacket: packet,
+                    } as ErrorPacket);
+                } else {
+                    this.sendEventsToClients(room, [membershipEvent]);
+                }
             } catch (e) {
                 this.sendToClient(client, {
                     type: PacketType.Error,
@@ -107,25 +141,28 @@ export class ClientServerApi {
 
     private userInviteRoom(client: ChatClient, packet: InvitePacket) {
         const room = this.roomServer.getRoom(packet.targetRoomId);
-        if (!room || !room.isJoined(client.userId)) {
+        if (!room) {
             this.sendToClient(client, {
                 type: PacketType.Error,
-                message: "Unknown room (to you)",
+                message: "Unknown room",
                 originalPacket: packet,
             } as ErrorPacket);
         } else {
             try {
-                room.invite(packet.targetUserId);
-                const invitePacket: RoomInvitedPacket = {
-                    type: PacketType.RoomInvited,
-                    roomId: room.roomId,
-                    targetUserId: packet.targetUserId,
-                };
-                this.sendToClients(room, invitePacket);
+                const membershipEvent = room.inviteHelper(client.userId, packet.targetUserId);
+                if (!membershipEvent) {
+                    this.sendToClient(client, {
+                        type: PacketType.Error,
+                        message: "Unable to invite user to room",
+                        originalPacket: packet,
+                    } as ErrorPacket);
+                } else {
+                    this.sendEventsToClients(room, [membershipEvent]);
 
-                const targetClient = this.clients.find(c => c.userId === packet.targetUserId);
-                if (targetClient) {
-                    this.sendToClient(targetClient, invitePacket);
+                    const targetClient = this.clients.find(c => c.userId === packet.targetUserId);
+                    if (targetClient) {
+                        this.sendEventToClient(targetClient, membershipEvent);
+                    }
                 }
             } catch (e) {
                 this.sendToClient(client, {
@@ -139,14 +176,28 @@ export class ClientServerApi {
 
     private userSend(client: ChatClient, packet: SendPacket) {
         const room = this.roomServer.getRoom(packet.roomId);
-        if (!room || !room.isJoined(client.userId)) {
+        if (!room) {
             this.sendToClient(client, {
                 type: PacketType.Error,
-                message: "Unknown room (to you)",
+                message: "Unknown room",
                 originalPacket: packet,
             } as ErrorPacket);
         } else {
-            this.sendToClients(room, {...packet, type: PacketType.Event, sender: client.userId} as EventPacket);
+            const event = room.createEventFrom({
+                type: packet.eventType,
+                state_key: packet.stateKey,
+                sender: client.userId,
+                content: packet.content,
+            });
+            if (!room.trySendEvent(event)) {
+                this.sendToClient(client, {
+                    type: PacketType.Error,
+                    message: "Unable to send event to room",
+                    originalPacket: packet,
+                } as ErrorPacket);
+            } else {
+                this.sendToClients(room, {type: PacketType.Event, event: event} as EventPacket);
+            }
         }
     }
 }

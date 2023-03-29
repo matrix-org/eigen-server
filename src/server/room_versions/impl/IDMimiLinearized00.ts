@@ -5,8 +5,15 @@ import {getDomainFromId} from "../../../util/id";
 import {PowerLevels} from "../../../models/PowerLevels";
 
 export class IDMimiLinearized00 implements RoomVersion {
+    public static readonly Identifier = "org.matrix.i-d.ralston-mimi-linearized-matrix.00";
+
     public isValid(event: MatrixEvent): boolean {
-        return true; // TODO: This. https://github.com/matrix-org/linearized-matrix/issues/6
+        if (event.type === "m.room.create" && event.content["room_version"] !== IDMimiLinearized00.Identifier) {
+            return false;
+        }
+
+        // TODO: This. https://github.com/matrix-org/linearized-matrix/issues/6
+        return true;
     }
 
     public isAllowed(event: MatrixEvent, allEvents: MatrixEvent[]): boolean {

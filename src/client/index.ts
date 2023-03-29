@@ -70,7 +70,13 @@ process.stdin.on("data", (key: string) => {
             if (!currentRoomId) {
                 ui.log.write("* | You are not chatting in a room.");
             } else {
-                sendPacket({type: PacketType.Send, roomId: currentRoomId, content: {body: buffer}} as SendPacket);
+                sendPacket({
+                    type: PacketType.Send,
+                    roomId: currentRoomId,
+                    eventType: "m.room.message",
+                    stateKey: undefined,
+                    content: {body: buffer},
+                } as SendPacket);
             }
         }
         buffer = "";
@@ -133,7 +139,12 @@ function onInvite(invite: RoomInvitedPacket) {
     }
 }
 
-function onEvent(event: EventPacket) {
+function onEvent(packet: EventPacket) {
+    const event = packet.event;
     const displayName = event.sender === myUserId ? "You" : event.sender;
-    ui.log.write(`${displayName} | ${JSON.stringify(event.content)}`);
+    ui.log.write(
+        `${displayName} | ${event.type} (state_key: ${JSON.stringify(event.state_key)}) ${JSON.stringify(
+            event.content,
+        )}`,
+    );
 }

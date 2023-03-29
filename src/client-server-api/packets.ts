@@ -1,3 +1,5 @@
+import {MatrixEvent} from "../models/event";
+
 export enum PacketType {
     Login, // Server -> Client
     CreateRoom, // Client -> Server
@@ -51,12 +53,12 @@ export interface ErrorPacket extends Packet {
 export interface SendPacket extends Packet {
     type: PacketType.Send;
     roomId: string;
+    eventType: string;
+    stateKey?: string;
     content: any;
 }
 
 export interface EventPacket extends Packet {
     type: PacketType.Event;
-    roomId: string;
-    sender: string;
-    content: any;
+    event: MatrixEvent;
 }
