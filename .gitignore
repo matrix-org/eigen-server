@@ -1,6 +1,7 @@
 # Custom
 .idea/
 build/
+*signing.key
 
 # Logs
 logs

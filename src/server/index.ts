@@ -15,11 +15,14 @@ import {
     SendPacket,
 } from "../client-server-api/packets";
 import {createRoom, Room} from "../models/room";
+import {Keyserver} from "./keyserver";
 
 const port: number = Number(process.env["LM_PORT"] ?? 3000);
 const serverName = `localhost:${port}`;
 const app = express();
 const wsApp = expressWs(app).app;
+
+console.log("Server name: ", serverName);
 
 interface ChatClient {
     ws: WebSocket;
@@ -54,6 +57,8 @@ wsApp.ws("/client", (ws, req) => {
         }
     });
 });
+
+new Keyserver(serverName).registerRoutes(app);
 
 app.listen(port, () => console.log(`Listening on ${port}`));
 
