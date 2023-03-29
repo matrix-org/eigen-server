@@ -5,6 +5,7 @@
   "main": "index.js",
   "repository": "git@github.com:matrix-org/linearized-matrix.git",
   "author": "The Matrix.org Foundation C.I.C.",
+  "license": "AGPL-3.0",
   "private": true,
   "dependencies": {
     "canonicalize": "^1.0.8",
