@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import {getDomainFromId} from "../util/id";
 
 export class Room {
     public readonly joined: string[] = [];
@@ -35,7 +36,7 @@ export class Room {
 }
 
 export function createRoom(creator: string): Room {
-    const serverName = creator.split(":").slice(1).join(":");
+    const serverName = getDomainFromId(creator);
     const localpart = crypto.randomUUID();
     return new Room(`!${localpart}:${serverName}`, creator);
 }
