@@ -183,7 +183,10 @@ export class IDMimiLinearized00 implements RoomVersion {
             }
         }
 
-        if (!powerLevels.canUserSend(event.sender, event.type, event.state_key !== undefined)) {
+        if (
+            powerLevelsEv !== undefined &&
+            !powerLevels.canUserSend(event.sender, event.type, event.state_key !== undefined)
+        ) {
             throw new Error(`${event.type}: power levels do not permit sending this event`);
         }
 
