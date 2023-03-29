@@ -26,11 +26,15 @@ export class Room {
             .map(e => e.state_key!);
     }
 
-    public trySendEvent(event: MatrixEvent): boolean {
-        if (!this.roomVersion.isValid(event)) return false;
-        if (!this.roomVersion.isAllowed(event, this.events)) return false;
+    /**
+     * Sends an event to the room. Throws if there's a problem with that
+     * (missing permission, illegal state, etc).
+     * @param event The event to send
+     */
+    public sendEvent(event: MatrixEvent): void {
+        this.roomVersion.checkValidity(event);
+        this.roomVersion.checkAuth(event, this.events);
         this.events.push(event);
-        return true;
     }
 
     public createEventFrom(partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts">): MatrixEvent {
@@ -55,7 +59,7 @@ export class Room {
         };
     }
 
-    public joinHelper(userId: string): MatrixEvent | null {
+    public joinHelper(userId: string): MatrixEvent {
         const membershipEvent: MatrixEvent = this.createEventFrom({
             type: "m.room.member",
             state_key: userId,
@@ -64,10 +68,11 @@ export class Room {
                 membership: "join",
             },
         });
-        return this.trySendEvent(membershipEvent) ? membershipEvent : null;
+        this.sendEvent(membershipEvent);
+        return membershipEvent;
     }
 
-    public inviteHelper(senderUserId: string, targetUserId: string): MatrixEvent | null {
+    public inviteHelper(senderUserId: string, targetUserId: string): MatrixEvent {
         const membershipEvent: MatrixEvent = this.createEventFrom({
             type: "m.room.member",
             state_key: targetUserId,
@@ -76,7 +81,8 @@ export class Room {
                 membership: "invite",
             },
         });
-        return this.trySendEvent(membershipEvent) ? membershipEvent : null;
+        this.sendEvent(membershipEvent);
+        return membershipEvent;
     }
 
     public static create(creatorUserId: string): Room {
@@ -85,87 +91,69 @@ export class Room {
         const localpart = crypto.randomUUID();
         const roomId = `!${localpart}:${serverName}`;
         const room = new Room(roomId, getRoomVersionImpl(DefaultRoomVersion));
-        if (
-            !room.trySendEvent(
-                room.createEventFrom({
-                    type: "m.room.create",
-                    state_key: "",
-                    sender: creatorUserId,
-                    content: {
-                        room_version: DefaultRoomVersion,
+        room.sendEvent(
+            room.createEventFrom({
+                type: "m.room.create",
+                state_key: "",
+                sender: creatorUserId,
+                content: {
+                    room_version: DefaultRoomVersion,
+                },
+            }),
+        );
+        room.joinHelper(creatorUserId);
+        room.sendEvent(
+            room.createEventFrom({
+                type: "m.room.power_levels",
+                state_key: "",
+                sender: creatorUserId,
+                content: {
+                    // Note: these values are deliberately non-default and are a best value approximation
+                    ban: 50,
+                    kick: 50,
+                    invite: 50, // default 0
+                    redact: 50,
+                    notifications: {
+                        room: 50,
                     },
-                }),
-            )
-        ) {
-            throw new Error("Unable to send initial m.room.create event");
-        }
-        if (!room.joinHelper(creatorUserId)) {
-            throw new Error("Unable to send initial m.room.member event");
-        }
-        if (
-            !room.trySendEvent(
-                room.createEventFrom({
-                    type: "m.room.power_levels",
-                    state_key: "",
-                    sender: creatorUserId,
-                    content: {
-                        // Note: these values are deliberately non-default and are a best value approximation
-                        ban: 50,
-                        kick: 50,
-                        invite: 50, // default 0
-                        redact: 50,
-                        notifications: {
-                            room: 50,
-                        },
-                        event_default: 0,
-                        state_default: 50,
-                        events: {
-                            // by default no events are specified in this map
-                            "m.room.encryption": 100,
-                            "m.room.history_visibility": 100,
-                            "m.room.power_levels": 100,
-                            "m.room.server_acl": 100,
-                            "m.room.tombstone": 100,
-                        },
-                        users_default: 0,
-                        users: {
-                            // by default no users are specified in this map
-                            [creatorUserId]: 100,
-                        },
+                    event_default: 0,
+                    state_default: 50,
+                    events: {
+                        // by default no events are specified in this map
+                        "m.room.encryption": 100,
+                        "m.room.history_visibility": 100,
+                        "m.room.power_levels": 100,
+                        "m.room.server_acl": 100,
+                        "m.room.tombstone": 100,
                     },
-                }),
-            )
-        ) {
-            throw new Error("Unable to send initial m.room.power_levels event");
-        }
-        if (
-            !room.trySendEvent(
-                room.createEventFrom({
-                    type: "m.room.join_rules",
-                    state_key: "",
-                    sender: creatorUserId,
-                    content: {
-                        join_rule: "invite",
+                    users_default: 0,
+                    users: {
+                        // by default no users are specified in this map
+                        [creatorUserId]: 100,
                     },
-                }),
-            )
-        ) {
-            throw new Error("Unable to send initial m.room.join_rules event");
-        }
-        if (
-            !room.trySendEvent(
-                room.createEventFrom({
-                    type: "m.room.history_visibility",
-                    state_key: "",
-                    sender: creatorUserId,
-                    content: {
-                        history_visibility: "shared",
-                    },
-                }),
-            )
-        ) {
-            throw new Error("Unable to send initial m.room.history_visibility event");
-        }
+                },
+            }),
+        );
+        room.sendEvent(
+            room.createEventFrom({
+                type: "m.room.join_rules",
+                state_key: "",
+                sender: creatorUserId,
+                content: {
+                    join_rule: "invite",
+                },
+            }),
+        );
+        room.sendEvent(
+            room.createEventFrom({
+                type: "m.room.history_visibility",
+                state_key: "",
+                sender: creatorUserId,
+                content: {
+                    history_visibility: "shared",
+                },
+            }),
+        );
         return room;
     }
 }

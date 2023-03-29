@@ -189,14 +189,15 @@ export class ClientServerApi {
                 sender: client.userId,
                 content: packet.content,
             });
-            if (!room.trySendEvent(event)) {
+            try {
+                room.sendEvent(event);
+                this.sendToClients(room, {type: PacketType.Event, event: event} as EventPacket);
+            } catch (e) {
                 this.sendToClient(client, {
                     type: PacketType.Error,
-                    message: "Unable to send event to room",
+                    message: (e as Error)?.message ?? "Unknown error",
                     originalPacket: packet,
                 } as ErrorPacket);
-            } else {
-                this.sendToClients(room, {type: PacketType.Event, event: event} as EventPacket);
             }
         }
     }

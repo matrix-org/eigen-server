@@ -2,18 +2,19 @@ import {MatrixEvent} from "../../models/event";
 
 export interface RoomVersion {
     /**
-     * Applies the required schema and signature validations to the event, returning
-     * false if any check fails.
+     * Checks the required schema and performs signature validations on the event,
+     * throwing an error if any of the checks fail.
      * @param event The event to validate.
      */
-    isValid(event: MatrixEvent): boolean;
+    checkValidity(event: MatrixEvent): void;
     /**
-     * Determines if an event is allowed by the authorization rules for the room version,
-     * given the room as a linearized DAG (index 0 should be the create event if not
-     * validating the create event itself).
+     * Checks if an event is allowed by the authorization rules for the room version,
+     * given the room as a linearized DAG (index 0 should the create event if not
+     * validating the create event itself). Throws if there's an auth error (permissions,
+     * illegal state, etc).
      * @param event The event to validate.
      * @param allEvents The events which have already been accepted, ordered.
      */
-    isAllowed(event: MatrixEvent, allEvents: MatrixEvent[]): boolean;
+    checkAuth(event: MatrixEvent, allEvents: MatrixEvent[]): void;
     redact(event: MatrixEvent): object;
 }

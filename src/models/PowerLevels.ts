@@ -6,12 +6,16 @@ export class PowerLevels {
     public constructor(private event: MatrixEvent | undefined) {}
 
     public getUserLevel(userId: string): number {
-        if (Number.isInteger(this.event?.content["users"]?.[userId])) {
-            return this.event?.content["users"]?.[userId];
+        const explicitLevel = this.event?.content["users"]?.[userId];
+        if (Number.isInteger(explicitLevel)) {
+            return explicitLevel;
         }
-        if (Number.isInteger(this.event?.content["users_default"])) {
-            return this.event!.content["users_default"];
+
+        const defaultLevel = this.event?.content["users_default"];
+        if (Number.isInteger(defaultLevel)) {
+            return defaultLevel;
         }
+
         return 0;
     }
 
