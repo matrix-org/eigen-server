@@ -3,6 +3,44 @@ import {MatrixEvent} from "../../../models/event";
 import {CurrentRoomState} from "../../../models/CurrentRoomState";
 import {getDomainFromId} from "../../../util/id";
 import {PowerLevels} from "../../../models/PowerLevels";
+import {RedactConfig, redactObject} from "../../../util/redaction";
+
+const PDU_KEEP_FIELDS: RedactConfig = {
+    // https://spec.matrix.org/v1.6/rooms/v10/#redactions
+    keepTopLevel: [
+        "event_id",
+        "type",
+        "room_id",
+        "sender",
+        "state_key",
+        "content",
+        "hashes",
+        "signatures",
+        "depth",
+        "prev_events",
+        "auth_events",
+        "origin",
+        "origin_server_ts",
+        "membership",
+    ],
+    keepUnder: {
+        "m.room.member": {
+            content: ["membership", "join_authorised_via_users_server"],
+        },
+        "m.room.create": {
+            content: ["creator"],
+        },
+        "m.room.join_rules": {
+            content: ["join_rule", "allow"],
+        },
+        "m.room.power_levels": {
+            content: ["ban", "events", "events_default", "kick", "redact", "state_default", "users", "users_default"],
+        },
+        "m.room.history_visibility": {
+            content: ["history_visibility"],
+        },
+    },
+};
 
 export class IDMimiLinearized00 implements RoomVersion {
     public static readonly Identifier = "org.matrix.i-d.ralston-mimi-linearized-matrix.00";
@@ -378,6 +416,6 @@ export class IDMimiLinearized00 implements RoomVersion {
     }
 
     public redact(event: MatrixEvent | Omit<MatrixEvent, "signatures">): object {
-        return {}; // TODO: This. https://github.com/matrix-org/linearized-matrix/issues/8
+        return redactObject(event, PDU_KEEP_FIELDS);
     }
 }
