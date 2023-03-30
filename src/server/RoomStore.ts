@@ -1,6 +1,6 @@
 import {Room} from "../models/Room";
 
-export class RoomServer {
+export class RoomStore {
     private rooms: Room[] = []; // TODO: Persist
 
     public createRoom(creator: string): Room {

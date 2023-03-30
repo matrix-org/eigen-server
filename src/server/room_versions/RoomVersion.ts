@@ -16,5 +16,5 @@ export interface RoomVersion {
      * @param allEvents The events which have already been accepted, ordered.
      */
     checkAuth(event: MatrixEvent, allEvents: MatrixEvent[]): void;
-    redact(event: MatrixEvent): object;
+    redact(event: MatrixEvent | Omit<MatrixEvent, "signatures">): object;
 }

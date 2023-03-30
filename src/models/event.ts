@@ -4,8 +4,8 @@ export interface MatrixEvent {
     state_key?: string | undefined;
     sender: string;
     origin_server_ts: number;
-    original_authorized_sending_server?: string | undefined;
-    authorized_sending_server?: string | undefined;
+    owner_server?: string;
+    delegated_server?: string;
     content: Record<string, any>;
     hashes: {
         sha256: string;
@@ -22,10 +22,7 @@ export interface StateEvent extends MatrixEvent {
 }
 
 export interface ClientFriendlyMatrixEvent
-    extends Omit<
-        MatrixEvent,
-        "original_authorized_sending_server" | "authorized_sending_server" | "hashes" | "signatures"
-    > {}
+    extends Omit<MatrixEvent, "delegated_server" | "owner_server" | "hashes" | "signatures"> {}
 
 export interface V4PDU extends MatrixEvent {
     auth_events: string[];

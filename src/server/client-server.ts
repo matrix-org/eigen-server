@@ -15,7 +15,7 @@ import {
 } from "../client-server-api/packets";
 import expressWs from "express-ws";
 import {Room} from "../models/Room";
-import {RoomServer} from "./room-server";
+import {RoomStore} from "./RoomStore";
 import {MatrixEvent} from "../models/event";
 
 interface ChatClient {
@@ -26,7 +26,7 @@ interface ChatClient {
 export class ClientServerApi {
     private clients: ChatClient[] = [];
 
-    public constructor(private serverName: string, private roomServer: RoomServer) {}
+    public constructor(private serverName: string, private roomServer: RoomStore) {}
 
     public registerRoutes(app: Express) {
         const wsApp = expressWs(app).app;

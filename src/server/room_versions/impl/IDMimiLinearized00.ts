@@ -377,7 +377,7 @@ export class IDMimiLinearized00 implements RoomVersion {
         return; // "otherwise, allow" catch-all
     }
 
-    public redact(event: MatrixEvent): object {
+    public redact(event: MatrixEvent | Omit<MatrixEvent, "signatures">): object {
         return {}; // TODO: This. https://github.com/matrix-org/linearized-matrix/issues/8
     }
 }

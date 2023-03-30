@@ -4,6 +4,8 @@ import {RoomVersion} from "../server/room_versions/RoomVersion";
 import {ClientFriendlyMatrixEvent, MatrixEvent} from "./event";
 import {CurrentRoomState} from "./CurrentRoomState";
 import {DefaultRoomVersion, getRoomVersionImpl} from "../server/room_versions/map";
+import {calculateContentHash} from "../util/hashing";
+import {Runtime} from "../server/Runtime";
 
 export class Room {
     private events: MatrixEvent[] = [];
@@ -26,6 +28,16 @@ export class Room {
             .map(e => e.state_key!);
     }
 
+    public get ownerDomain(): string {
+        // TODO: Support owner transfer
+        // https://github.com/matrix-org/linearized-matrix/issues/11
+        const createEvent = this.currentState.get("m.room.create", "");
+        if (createEvent === undefined) {
+            return Runtime.signingKey.serverName; // we'll be creating this room
+        }
+        return getDomainFromId(createEvent.sender);
+    }
+
     /**
      * Sends an event to the room. Throws if there's a problem with that
      * (missing permission, illegal state, etc).
@@ -38,24 +50,20 @@ export class Room {
     }
 
     public createEventFrom(partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts">): MatrixEvent {
-        return {
+        const hashed = calculateContentHash({
             room_id: this.roomId,
             type: partial.type,
             state_key: partial.state_key,
             sender: partial.sender,
             origin_server_ts: new Date().getTime(),
-            // authorized_sending_server: "", // TODO: Figure out room owner, if not us
+            owner_server: this.ownerDomain,
             content: partial.content,
-            hashes: {
-                // TODO: Calculate event hash properly
-                sha256: "TODO",
-            },
-            signatures: {
-                // TODO: Calculate event signature properly
-                "example.org": {
-                    "ed25519:1": "TODO",
-                },
-            },
+        });
+        const redacted = this.roomVersion.redact(hashed);
+        const signed = Runtime.signingKey.signJson(redacted);
+        return {
+            ...hashed,
+            signatures: signed.signatures,
         };
     }
 
