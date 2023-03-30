@@ -38,6 +38,14 @@ export class Room {
         return getDomainFromId(createEvent.sender);
     }
 
+    public get gatewayDomain(): string | undefined {
+        const dagJoin = this.currentState
+            .getAll("m.room.member")
+            .filter(e => e.content["membership"] === "join")
+            .find(e => e.owner_server === undefined);
+        return dagJoin ? getDomainFromId(dagJoin.sender) : undefined;
+    }
+
     /**
      * Sends an event to the room. Throws if there's a problem with that
      * (missing permission, illegal state, etc).
@@ -50,7 +58,7 @@ export class Room {
     }
 
     public createEventFrom(partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts">): MatrixEvent {
-        const hashed = calculateContentHash({
+        const template: Omit<MatrixEvent, "hashes" | "signatures"> = {
             room_id: this.roomId,
             type: partial.type,
             state_key: partial.state_key,
@@ -58,7 +66,11 @@ export class Room {
             origin_server_ts: new Date().getTime(),
             owner_server: this.ownerDomain,
             content: partial.content,
-        });
+        };
+        if (this.ownerDomain === Runtime.signingKey.serverName) {
+            template.delegated_server = this.gatewayDomain;
+        }
+        const hashed = calculateContentHash(template);
         const redacted = this.roomVersion.redact(hashed);
         const signed = Runtime.signingKey.signJson(redacted);
         return {
