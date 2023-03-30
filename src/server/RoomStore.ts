@@ -1,4 +1,4 @@
-import {Room} from "../models/Room";
+import {Room} from "./models/Room";
 
 export class RoomStore {
     private rooms: Room[] = []; // TODO: Persist

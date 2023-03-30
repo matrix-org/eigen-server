@@ -1,4 +1,4 @@
-import {unpaddedBase64Decode, unpaddedBase64Encode} from "../../src/util/b64";
+import {unpaddedBase64Decode, unpaddedBase64Encode} from "../../../src/server/util/b64";
 import {Buffer} from "buffer";
 
 describe("unpaddedBase64Encode", () => {

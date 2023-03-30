@@ -1,6 +1,6 @@
 import express, {Express} from "express";
-import {unpaddedBase64Decode, unpaddedBase64Encode} from "../util/b64";
-import {canonicalSerialize} from "../util/canonical_json";
+import {unpaddedBase64Decode, unpaddedBase64Encode} from "./util/b64";
+import {canonicalSerialize} from "./util/canonical_json";
 import * as forge from "node-forge";
 import {Runtime} from "./Runtime";
 import {FederationClient} from "./FederationClient";

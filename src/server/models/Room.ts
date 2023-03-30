@@ -1,11 +1,11 @@
 import * as crypto from "crypto";
 import {getDomainFromId} from "../util/id";
-import {RoomVersion} from "../server/room_versions/RoomVersion";
+import {RoomVersion} from "../room_versions/RoomVersion";
 import {ClientFriendlyMatrixEvent, MatrixEvent} from "./event";
 import {CurrentRoomState} from "./CurrentRoomState";
-import {DefaultRoomVersion, getRoomVersionImpl} from "../server/room_versions/map";
+import {DefaultRoomVersion, getRoomVersionImpl} from "../room_versions/map";
 import {calculateContentHash} from "../util/hashing";
-import {Runtime} from "../server/Runtime";
+import {Runtime} from "../Runtime";
 
 export class Room {
     private events: MatrixEvent[] = [];

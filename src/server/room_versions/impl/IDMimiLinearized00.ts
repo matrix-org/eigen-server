@@ -1,9 +1,9 @@
 import {RoomVersion} from "../RoomVersion";
-import {MatrixEvent} from "../../../models/event";
-import {CurrentRoomState} from "../../../models/CurrentRoomState";
-import {getDomainFromId} from "../../../util/id";
-import {PowerLevels} from "../../../models/PowerLevels";
-import {RedactConfig, redactObject} from "../../../util/redaction";
+import {MatrixEvent} from "../../models/event";
+import {CurrentRoomState} from "../../models/CurrentRoomState";
+import {getDomainFromId} from "../../util/id";
+import {PowerLevels} from "../../models/PowerLevels";
+import {RedactConfig, redactObject} from "../../util/redaction";
 
 const PDU_KEEP_FIELDS: RedactConfig = {
     // https://spec.matrix.org/v1.6/rooms/v10/#redactions

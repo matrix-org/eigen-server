@@ -12,10 +12,10 @@ import {
     RoomInvitedPacket,
     RoomJoinedPacket,
     SendPacket,
-} from "../client-server-api/packets";
+} from "./packets";
 import expressWs from "express-ws";
 import {Room} from "../models/Room";
-import {RoomStore} from "./RoomStore";
+import {RoomStore} from "../RoomStore";
 import {MatrixEvent} from "../models/event";
 
 interface ChatClient {

@@ -10,7 +10,7 @@ import {
     RoomInvitedPacket,
     RoomJoinedPacket,
     SendPacket,
-} from "../client-server-api/packets";
+} from "../server/client_server_api/packets";
 
 const ui = new inquirer.ui.BottomBar();
 

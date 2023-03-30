@@ -1,4 +1,4 @@
-import {MatrixEvent} from "../../models/event";
+import {MatrixEvent} from "../models/event";
 
 export interface RoomVersion {
     /**

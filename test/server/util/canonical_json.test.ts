@@ -1,4 +1,4 @@
-import {canonicalSerialize} from "../../src/util/canonical_json";
+import {canonicalSerialize} from "../../../src/server/util/canonical_json";
 
 describe("canonicalSerialize", () => {
     it("should behave per spec", () => {

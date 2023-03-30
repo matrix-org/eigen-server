@@ -1,7 +1,7 @@
 import fs from "fs";
 import forge from "node-forge";
-import {unpaddedBase64Decode, unpaddedBase64Encode} from "../util/b64";
-import {canonicalSerialize} from "../util/canonical_json";
+import {unpaddedBase64Decode, unpaddedBase64Encode} from "./util/b64";
+import {canonicalSerialize} from "./util/canonical_json";
 
 export class SelfSigningKey {
     private privateKey: forge.pki.ed25519.NativeBuffer;
