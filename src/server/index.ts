@@ -1,7 +1,7 @@
 import express from "express";
 import {KeyStore} from "./KeyStore";
 import {RoomStore} from "./RoomStore";
-import {ClientServerApi} from "./client-server";
+import {ClientServerApi} from "./ClientServerApi";
 import {Runtime} from "./Runtime";
 import {SelfSigningKey} from "./SelfSigningKey";
 
