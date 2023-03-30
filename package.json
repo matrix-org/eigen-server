@@ -38,8 +38,9 @@
     "test": "jest",
     "format": "prettier --config .prettierrc \"{src,test}/**/*.ts\" --write",
     "lint": "tsc -p tsconfig.json --noEmit && prettier --config .prettierrc \"{src,test}/**/*.ts\" --check",
-    "dev:client": "yarn build && node build/client/index.js",
+    "dev:client": "yarn build && yarn dev:client:nobuild",
     "dev:client:nobuild": "node build/client/index.js",
-    "dev:server": "yarn build && node build/server/index.js"
+    "dev:server": "yarn build && yarn dev:server:nobuild",
+    "dev:server:nobuild": "node build/server/index.js"
   }
 }
