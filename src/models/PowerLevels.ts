@@ -42,7 +42,7 @@ export class PowerLevels {
     }
 
     public canUserSend(userId: string, eventType: string, isState: boolean): boolean {
-        let requiredLevel = isState ? 50 : 0;
+        let requiredLevel = isState ? (this.event ? 50 : 0) : 0;
 
         const defaultLevel = isState ? this.event?.content["state_default"] : this.event?.content["events_default"];
         if (Number.isInteger(defaultLevel)) {
