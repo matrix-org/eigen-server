@@ -17,9 +17,6 @@ export class KeyStore {
 
     public registerRoutes(app: Express) {
         app.get("/_matrix/key/v2/server", this.onSelfKeyRequest.bind(this));
-        app.get("/test/:domain", async (req, res) => {
-            res.json(await this.getServerKeys(req.params.domain));
-        });
     }
 
     private async getServerKeys(domain: string): Promise<ServerKeys> {
