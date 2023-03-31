@@ -22,7 +22,9 @@ export interface StateEvent extends MatrixEvent {
 }
 
 export interface ClientFriendlyMatrixEvent
-    extends Omit<MatrixEvent, "delegated_server" | "owner_server" | "hashes" | "signatures"> {}
+    extends Omit<MatrixEvent, "delegated_server" | "owner_server" | "hashes" | "signatures"> {
+    // event_id: string; // normally we'd have this here, but we don't use it on our CS API example
+}
 
 export interface V4PDU extends MatrixEvent {
     auth_events: string[];

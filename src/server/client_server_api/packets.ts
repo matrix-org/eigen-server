@@ -1,4 +1,4 @@
-import {MatrixEvent} from "../models/event";
+import {ClientFriendlyMatrixEvent} from "../models/event";
 
 export enum PacketType {
     Login, // Server -> Client
@@ -60,5 +60,5 @@ export interface SendPacket extends Packet {
 
 export interface EventPacket extends Packet {
     type: PacketType.Event;
-    event: MatrixEvent;
+    event: ClientFriendlyMatrixEvent;
 }
