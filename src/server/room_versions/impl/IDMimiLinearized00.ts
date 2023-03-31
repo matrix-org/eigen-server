@@ -1,11 +1,15 @@
 import {RoomVersion} from "../RoomVersion";
-import {MatrixEvent} from "../../models/event";
+import {MatrixEvent, OnlyV4PDUFields, V4PDU} from "../../models/event";
 import {CurrentRoomState} from "../../models/CurrentRoomState";
 import {getDomainFromId} from "../../util/id";
 import {PowerLevels} from "../../models/PowerLevels";
 import {RedactConfig, redactObject} from "../../util/redaction";
+import Ajv, {Schema} from "ajv";
+import AjvErrors from "ajv-errors";
+import {KeyStore} from "../../KeyStore";
+import {calculateContentHash} from "../../util/hashing";
 
-const PDU_KEEP_FIELDS: RedactConfig = {
+const PduKeepFields: RedactConfig = {
     // https://spec.matrix.org/v1.6/rooms/v10/#redactions
     keepTopLevel: [
         "event_id",
@@ -42,15 +46,206 @@ const PDU_KEEP_FIELDS: RedactConfig = {
     },
 };
 
+const ajv = new Ajv({allErrors: true});
+AjvErrors(ajv);
+
+const EventSchema: Schema = {
+    type: "object",
+    properties: {
+        room_id: {
+            type: "string",
+            minLength: 4, // sigil + colon + characters, in theory
+            pattern: "^!.+:.+$",
+            nullable: false,
+        },
+        type: {
+            type: "string",
+            nullable: false,
+        },
+        state_key: {
+            type: "string",
+            nullable: false,
+        },
+        sender: {
+            type: "string",
+            minLength: 4, // sigil + colon + characters, in theory
+            pattern: "^@.+:.+$",
+            nullable: false,
+        },
+        content: {
+            type: "object",
+            nullable: false,
+            additionalProperties: true,
+        },
+        origin_server_ts: {
+            type: "integer",
+            // Ideally we'd specify our 2^56 limit here, but it's a bit too
+            // weird for JSON Schema.
+            nullable: false,
+        },
+        owner_server: {
+            type: "string",
+            nullable: false,
+            minLength: 3, // "a.b" at a minimum
+        },
+        delegated_server: {
+            type: "string",
+            nullable: false,
+            minLength: 3, // "a.b" at a minimum
+        },
+        hashes: {
+            type: "object",
+            nullable: false,
+            properties: {
+                sha256: {
+                    type: "string",
+                    nullable: false,
+                    minLength: 1, // probably more, honestly
+                },
+            },
+            required: ["sha256"],
+            errorMessage: {
+                properties: {
+                    sha256: "The sha256 hash is required and should be a non-empty string",
+                },
+            },
+        },
+        signatures: {
+            type: "object",
+            nullable: false,
+            additionalProperties: false,
+            patternProperties: {
+                ".+": {
+                    // domain name
+                    type: "object",
+                    nullable: false,
+                    additionalProperties: false,
+                    patternProperties: {
+                        "ed25519:.+": {
+                            // key ID
+                            type: "string", // signature
+                            nullable: false,
+                            minLength: 1,
+                        },
+                    },
+                },
+            },
+        },
+        unsigned: {
+            type: "object",
+            nullable: false,
+            additionalProperties: true,
+        },
+        auth_events: {
+            type: "array",
+            nullable: false,
+            items: {
+                type: "string",
+            },
+        },
+        prev_events: {
+            type: "array",
+            nullable: false,
+            items: {
+                type: "string",
+            },
+        },
+        depth: {
+            type: "integer",
+            // Ideally we'd specify our 2^56 limit here, but it's a bit too
+            // weird for JSON Schema.
+            nullable: false,
+        },
+    },
+    required: ["room_id", "type", "sender", "content", "origin_server_ts", "hashes", "signatures"],
+    errorMessage: {
+        properties: {
+            room_id: "The room ID should be a string prefixed with `!` and contain a `:`, and is required",
+            type: "The event type should be a string of zero or more characters, and is required",
+            state_key: "The state key should be a string of zero or more characters",
+            sender: "The sender should be a string prefixed with `@` and contain a `:`, and is required",
+            content: "The event content should at least be a defined object, and is required",
+            origin_server_ts: "The event timestamp should be a number, and is required",
+            unsigned: "The event's unsigned content should be a defined object",
+            owner_server: "The owner server should be a string representing a domain",
+            delegated_server: "The delegated server should be a string representing a domain",
+            hashes: "Hashes should be an object with a sha256 field",
+            signatures: "Signatures should be an object mapping domain to key ID to signature",
+            auth_events: "Auth events must be an array of strings",
+            prev_events: "Previous events must be an array of strings",
+            depth: "Depth must be an integer",
+        },
+    },
+};
+const TestEventFormatFn = ajv.compile(EventSchema);
+
 export class IDMimiLinearized00 implements RoomVersion {
     public static readonly Identifier = "org.matrix.i-d.ralston-mimi-linearized-matrix.00";
 
-    public checkValidity(event: MatrixEvent): void {
+    public async checkValidity(event: MatrixEvent | V4PDU, keyStore: KeyStore): Promise<void> {
+        if (!event) {
+            throw new Error("Event validation failed: no event supplied");
+        }
+
         if (event.type === "m.room.create" && event.content["room_version"] !== IDMimiLinearized00.Identifier) {
             throw new Error("m.room.create: Invalid room_version field");
         }
 
-        // TODO: This. https://github.com/matrix-org/linearized-matrix/issues/6
+        if (!TestEventFormatFn(event)) {
+            throw new Error(
+                "Event failed validation: " +
+                    (TestEventFormatFn.errors?.map(m => (m.message ? m.message : JSON.stringify(m))).join(", ") ??
+                        "Validation failed"),
+            );
+        }
+
+        if (typeof event.delegated_server === "string") {
+            if (typeof event.owner_server !== "string") {
+                throw new Error(`${event.type}: Validation Failed: Missing owner_server to go with delegated_server`);
+            }
+
+            // Verify PDU (whatever we received) signature
+            const redacted = this.redact(event);
+            if (!(await keyStore.validateDomainSignature(redacted, event.delegated_server))) {
+                throw new Error(`${event.type}: Validation Failed: Signature error on delegated_server`);
+            }
+        }
+        if (typeof event.owner_server === "string") {
+            const dlpdu: MatrixEvent & Partial<OnlyV4PDUFields> = JSON.parse(JSON.stringify(event));
+            delete dlpdu["auth_events"];
+            delete dlpdu["prev_events"];
+            delete dlpdu["depth"];
+
+            // Verify (D)LPDU signature
+            let redacted = this.redact(dlpdu);
+            if (!(await keyStore.validateDomainSignature(redacted, event.owner_server))) {
+                throw new Error(`${event.type}: Validation Failed: Signature error on owner_server`);
+            }
+
+            // Verify sender signature
+            delete dlpdu["delegated_server"]; // convert to LPDU for this check
+            redacted = this.redact(dlpdu);
+            const senderDomain = getDomainFromId(dlpdu.sender);
+            if (!(await keyStore.validateDomainSignature(redacted, senderDomain))) {
+                throw new Error(`${event.type}: Validation Failed: Signature error on owner_server + sender`);
+            }
+        }
+        if (typeof event.owner_server !== "string" && typeof event.delegated_server !== "string") {
+            // Verify sender signature on PDU
+            const senderDomain = getDomainFromId(event.sender);
+            const redacted = this.redact(event);
+            if (!(await keyStore.validateDomainSignature(redacted, senderDomain))) {
+                throw new Error(`${event.type}: Validation Failed: Signature error on sender`);
+            }
+        }
+
+        // Check content hash
+        const hash = calculateContentHash(event).hashes.sha256;
+        if (hash !== event.hashes.sha256) {
+            throw new Error(`${event.type}: Validation Failed: Invalid content hash`);
+        }
+
+        // If we managed to make it here, we passed validation 🎉
     }
 
     public checkAuth(event: MatrixEvent, allEvents: MatrixEvent[]): void {
@@ -416,6 +611,6 @@ export class IDMimiLinearized00 implements RoomVersion {
     }
 
     public redact(event: MatrixEvent | Omit<MatrixEvent, "signatures">): object {
-        return redactObject(event, PDU_KEEP_FIELDS);
+        return redactObject(event, PduKeepFields);
     }
 }

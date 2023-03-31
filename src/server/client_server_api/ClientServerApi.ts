@@ -103,13 +103,13 @@ export class ClientServerApi {
         this.sendToClient(client, {type: PacketType.Event, event: event} as EventPacket);
     }
 
-    private userCreateRoom(client: ChatClient) {
-        const room = this.roomServer.createRoom(client.userId);
+    private async userCreateRoom(client: ChatClient) {
+        const room = await this.roomServer.createRoom(client.userId);
         console.log(`${client.userId} | Room created: ${room.roomId}`);
         this.sendEventsToClients(room, room.orderedEvents);
     }
 
-    private userJoinRoom(client: ChatClient, packet: JoinPacket) {
+    private async userJoinRoom(client: ChatClient, packet: JoinPacket) {
         const room = this.roomServer.getRoom(packet.targetRoomId);
         if (!room) {
             this.sendToClient(client, {
@@ -119,7 +119,7 @@ export class ClientServerApi {
             } as ErrorPacket);
         } else {
             try {
-                const membershipEvent = room.joinHelper(client.userId);
+                const membershipEvent = await room.joinHelper(client.userId);
                 if (!membershipEvent) {
                     this.sendToClient(client, {
                         type: PacketType.Error,
@@ -139,7 +139,7 @@ export class ClientServerApi {
         }
     }
 
-    private userInviteRoom(client: ChatClient, packet: InvitePacket) {
+    private async userInviteRoom(client: ChatClient, packet: InvitePacket) {
         const room = this.roomServer.getRoom(packet.targetRoomId);
         if (!room) {
             this.sendToClient(client, {
@@ -149,7 +149,7 @@ export class ClientServerApi {
             } as ErrorPacket);
         } else {
             try {
-                const membershipEvent = room.inviteHelper(client.userId, packet.targetUserId);
+                const membershipEvent = await room.inviteHelper(client.userId, packet.targetUserId);
                 if (!membershipEvent) {
                     this.sendToClient(client, {
                         type: PacketType.Error,

@@ -15,8 +15,9 @@ console.log("Server name: ", serverName);
 Runtime.signingKey = new SelfSigningKey(serverName);
 
 // Start registering routes and stuff
-const roomStore = new RoomStore();
+const keyStore = new KeyStore();
+const roomStore = new RoomStore(keyStore);
 new ClientServerApi(serverName, roomStore).registerRoutes(app);
-new KeyStore().registerRoutes(app);
+keyStore.registerRoutes(app);
 
 app.listen(port, () => console.log(`Listening on ${port}`));

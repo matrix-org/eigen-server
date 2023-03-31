@@ -1,3 +1,4 @@
+// XXX: Arguably this definition should be part of the room version for format reasons
 export interface MatrixEvent {
     room_id: string;
     type: string;
@@ -26,8 +27,9 @@ export interface ClientFriendlyMatrixEvent
     // event_id: string; // normally we'd have this here, but we don't use it on our CS API example
 }
 
-export interface V4PDU extends MatrixEvent {
+export interface OnlyV4PDUFields {
     auth_events: string[];
     depth: number;
     prev_events: string[];
 }
+export interface V4PDU extends MatrixEvent, OnlyV4PDUFields {}

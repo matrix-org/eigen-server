@@ -6,11 +6,12 @@ import {CurrentRoomState} from "./CurrentRoomState";
 import {DefaultRoomVersion, getRoomVersionImpl} from "../room_versions/map";
 import {calculateContentHash} from "../util/hashing";
 import {Runtime} from "../Runtime";
+import {KeyStore} from "../KeyStore";
 
 export class Room {
     private events: MatrixEvent[] = [];
 
-    private constructor(public roomId: string, private roomVersion: RoomVersion) {}
+    private constructor(public roomId: string, private roomVersion: RoomVersion, private keyStore: KeyStore) {}
 
     public get currentState(): CurrentRoomState {
         return new CurrentRoomState(this.events);
@@ -49,15 +50,19 @@ export class Room {
     /**
      * Sends an event to the room. Throws if there's a problem with that
      * (missing permission, illegal state, etc).
+     *
+     * Operates asynchronously.
      * @param event The event to send
      */
-    public sendEvent(event: MatrixEvent): void {
-        this.roomVersion.checkValidity(event);
+    public async sendEvent(event: MatrixEvent): Promise<void> {
+        await this.roomVersion.checkValidity(event, this.keyStore);
         this.roomVersion.checkAuth(event, this.events);
         this.events.push(event);
     }
 
-    public createEventFrom(partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts">): MatrixEvent {
+    public createEventFrom(
+        partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts" | "event_id">,
+    ): MatrixEvent {
         const template: Omit<MatrixEvent, "hashes" | "signatures"> = {
             room_id: this.roomId,
             type: partial.type,
@@ -79,7 +84,7 @@ export class Room {
         };
     }
 
-    public joinHelper(userId: string): MatrixEvent {
+    public async joinHelper(userId: string): Promise<MatrixEvent> {
         const membershipEvent: MatrixEvent = this.createEventFrom({
             type: "m.room.member",
             state_key: userId,
@@ -88,11 +93,11 @@ export class Room {
                 membership: "join",
             },
         });
-        this.sendEvent(membershipEvent);
+        await this.sendEvent(membershipEvent);
         return membershipEvent;
     }
 
-    public inviteHelper(senderUserId: string, targetUserId: string): MatrixEvent {
+    public async inviteHelper(senderUserId: string, targetUserId: string): Promise<MatrixEvent> {
         const membershipEvent: MatrixEvent = this.createEventFrom({
             type: "m.room.member",
             state_key: targetUserId,
@@ -101,17 +106,17 @@ export class Room {
                 membership: "invite",
             },
         });
-        this.sendEvent(membershipEvent);
+        await this.sendEvent(membershipEvent);
         return membershipEvent;
     }
 
-    public static create(creatorUserId: string): Room {
+    public static async create(creatorUserId: string, keyStore: KeyStore): Promise<Room> {
         // TODO: Validate that the creator is on our server
         const serverName = getDomainFromId(creatorUserId);
         const localpart = crypto.randomUUID();
         const roomId = `!${localpart}:${serverName}`;
-        const room = new Room(roomId, getRoomVersionImpl(DefaultRoomVersion));
-        room.sendEvent(
+        const room = new Room(roomId, getRoomVersionImpl(DefaultRoomVersion), keyStore);
+        await room.sendEvent(
             room.createEventFrom({
                 type: "m.room.create",
                 state_key: "",
@@ -121,8 +126,8 @@ export class Room {
                 },
             }),
         );
-        room.joinHelper(creatorUserId);
-        room.sendEvent(
+        await room.joinHelper(creatorUserId);
+        await room.sendEvent(
             room.createEventFrom({
                 type: "m.room.power_levels",
                 state_key: "",
@@ -154,7 +159,7 @@ export class Room {
                 },
             }),
         );
-        room.sendEvent(
+        await room.sendEvent(
             room.createEventFrom({
                 type: "m.room.join_rules",
                 state_key: "",
@@ -164,7 +169,7 @@ export class Room {
                 },
             }),
         );
-        room.sendEvent(
+        await room.sendEvent(
             room.createEventFrom({
                 type: "m.room.history_visibility",
                 state_key: "",
