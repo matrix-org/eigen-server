@@ -280,7 +280,7 @@ export class IDMimiLinearized00 implements RoomVersion {
         const joinRule = joinRulesEv?.content["join_rule"] ?? "invite";
 
         const powerLevelsEv = currentState.get("m.room.power_levels", "");
-        const powerLevels = new PowerLevels(powerLevelsEv);
+        const powerLevels = new PowerLevels(powerLevelsEv, createEvent);
 
         const senderMembershipEv = currentState.get("m.room.member", event.sender);
         const senderMembership = senderMembershipEv?.content["membership"] ?? "leave";
