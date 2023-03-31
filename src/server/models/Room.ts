@@ -13,6 +13,10 @@ export class Room {
 
     private constructor(public roomId: string, private roomVersion: RoomVersion, private keyStore: KeyStore) {}
 
+    public get versionString(): string {
+        return this.roomVersion.id;
+    }
+
     public get currentState(): CurrentRoomState {
         return new CurrentRoomState(this.events);
     }
@@ -108,6 +112,62 @@ export class Room {
         });
         await this.sendEvent(membershipEvent);
         return membershipEvent;
+    }
+
+    public static async createRoomForRemoteJoin(
+        userId: string,
+        roomId: string,
+        version: RoomVersion,
+        keyStore: KeyStore,
+    ): Promise<Room> {
+        const room = new Room(roomId, version, keyStore);
+        // We force the create event and sender member event into the "room" because we
+        // already know they'll fail signature checks: we don't care about those checks.
+        // The room created by this function is temporary and not stored.
+        room.events.push(
+            room.createEventFrom({
+                type: "m.room.create",
+                state_key: "",
+                sender: userId,
+                content: {
+                    room_version: version.id,
+                },
+            }),
+        );
+        return room;
+    }
+
+    public static async createRoomForInvite(
+        event: MatrixEvent,
+        version: RoomVersion,
+        keyStore: KeyStore,
+    ): Promise<Room> {
+        const room = new Room(event.room_id, version, keyStore);
+        // We force the create event and sender member event into the "room" because we
+        // already know they'll fail signature checks: we don't care about those checks.
+        // The room created by this function is temporary and not stored.
+        room.events.push(
+            room.createEventFrom({
+                type: "m.room.create",
+                state_key: "",
+                sender: event.sender,
+                content: {
+                    room_version: version.id,
+                },
+            }),
+        );
+        room.events.push(
+            room.createEventFrom({
+                type: "m.room.member",
+                state_key: event.sender,
+                sender: event.sender,
+                content: {
+                    membership: "join",
+                },
+            }),
+        );
+        await room.sendEvent(event);
+        return room;
     }
 
     public static async create(creatorUserId: string, keyStore: KeyStore): Promise<Room> {

@@ -132,7 +132,7 @@ function onJoin(join: RoomJoinedPacket) {
 }
 
 function onInvite(invite: RoomInvitedPacket) {
-    if (invite.targetUserId === myUserId) {
+    if (invite.targetUserId === myUserId && invite.roomId !== currentRoomId) {
         ui.log.write(`* | You have been invited to ${invite.roomId} - accept with \`/join ${invite.roomId}\``);
     } else if (invite.roomId === currentRoomId) {
         ui.log.write(`* | ${invite.targetUserId} was invited to the room`);

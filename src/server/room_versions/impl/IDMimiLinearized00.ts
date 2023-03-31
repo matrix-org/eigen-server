@@ -182,12 +182,16 @@ const TestEventFormatFn = ajv.compile(EventSchema);
 export class IDMimiLinearized00 implements RoomVersion {
     public static readonly Identifier = "org.matrix.i-d.ralston-mimi-linearized-matrix.00";
 
+    public get id(): string {
+        return IDMimiLinearized00.Identifier;
+    }
+
     public async checkValidity(event: MatrixEvent | V4PDU, keyStore: KeyStore): Promise<void> {
         if (!event) {
             throw new Error("Event validation failed: no event supplied");
         }
 
-        if (event.type === "m.room.create" && event.content["room_version"] !== IDMimiLinearized00.Identifier) {
+        if (event.type === "m.room.create" && event.content["room_version"] !== this.id) {
             throw new Error("m.room.create: Invalid room_version field");
         }
 

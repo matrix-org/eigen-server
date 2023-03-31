@@ -2,6 +2,7 @@ import {MatrixEvent} from "../models/event";
 import {KeyStore} from "../KeyStore";
 
 export interface RoomVersion {
+    id: string;
     /**
      * Checks the required schema and performs signature validations on the event,
      * throwing an error if any of the checks fail.

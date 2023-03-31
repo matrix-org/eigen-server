@@ -1,4 +1,5 @@
 import {FederationConnectionCache, FederationUrl} from "./FederationConnectionCache";
+import {MatrixEvent} from "./models/event";
 
 export class FederationClient {
     private url?: FederationUrl;
@@ -23,5 +24,38 @@ export class FederationClient {
         // TODO: Support https properly - https://github.com/matrix-org/linearized-matrix/issues/14
         // TODO: Handle http errors - https://github.com/matrix-org/linearized-matrix/issues/15
         return await (await fetch(`${(await this.getUrl()).httpsUrl}/_matrix/key/v2/server`)).json();
+    }
+
+    // TODO: Send auth header for non-key requests - https://github.com/matrix-org/linearized-matrix/issues/17
+
+    public async sendInvite(event: MatrixEvent, roomVersion: string): Promise<void> {
+        const res = await fetch(
+            `${(await this.getUrl()).httpsUrl}/_matrix/linearized/unstable/invite?room_version=${encodeURIComponent(
+                roomVersion,
+            )}`,
+            {
+                method: "POST",
+                body: JSON.stringify(event),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            },
+        );
+        if (res.status !== 200) {
+            throw new Error("Failed to send invite to server: " + (await res.text()));
+        }
+    }
+
+    public async sendEvents(events: MatrixEvent[]): Promise<void> {
+        const res = await fetch(`${(await this.getUrl()).httpsUrl}/_matrix/linearized/unstable/send`, {
+            method: "POST",
+            body: JSON.stringify(events),
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+        if (res.status !== 200) {
+            throw new Error("Failed to send invite to server: " + (await res.text()));
+        }
     }
 }

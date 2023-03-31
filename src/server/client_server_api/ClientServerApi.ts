@@ -17,6 +17,11 @@ import expressWs from "express-ws";
 import {Room} from "../models/Room";
 import {RoomStore} from "../RoomStore";
 import {MatrixEvent} from "../models/event";
+import {FederationClient} from "../FederationClient";
+import {getDomainFromId} from "../util/id";
+import {Runtime} from "../Runtime";
+import {DefaultRoomVersion, getRoomVersionImpl} from "../room_versions/map";
+import {KeyStore} from "../KeyStore";
 
 interface ChatClient {
     ws: WebSocket;
@@ -26,7 +31,7 @@ interface ChatClient {
 export class ClientServerApi {
     private clients: ChatClient[] = [];
 
-    public constructor(private serverName: string, private roomServer: RoomStore) {}
+    public constructor(private serverName: string, private roomServer: RoomStore, private keyStore: KeyStore) {}
 
     public registerRoutes(app: Express) {
         const wsApp = expressWs(app).app;
@@ -70,7 +75,7 @@ export class ClientServerApi {
         }
     }
 
-    private sendEventsToClients(room: Room, events: MatrixEvent[]) {
+    public sendEventsToClients(room: Room, events: MatrixEvent[]) {
         const userIds = room.joinedUserIds;
         for (const client of this.clients) {
             if (userIds.includes(client.userId)) {
@@ -103,6 +108,13 @@ export class ClientServerApi {
         this.sendToClient(client, {type: PacketType.Event, event: event} as EventPacket);
     }
 
+    public sendEventToUserId(userId: string, event: MatrixEvent) {
+        const client = this.clients.find(c => c.userId === userId);
+        if (client) {
+            this.sendEventToClient(client, event);
+        }
+    }
+
     private async userCreateRoom(client: ChatClient) {
         const room = await this.roomServer.createRoom(client.userId);
         console.log(`${client.userId} | Room created: ${room.roomId}`);
@@ -112,11 +124,31 @@ export class ClientServerApi {
     private async userJoinRoom(client: ChatClient, packet: JoinPacket) {
         const room = this.roomServer.getRoom(packet.targetRoomId);
         if (!room) {
-            this.sendToClient(client, {
-                type: PacketType.Error,
-                message: "Unknown room",
-                originalPacket: packet,
-            } as ErrorPacket);
+            try {
+                // XXX: This is a terrible way to determine if we're trying to join over federation
+                // XXX: We assume the room version here. What we're actually supposed to do is remember
+                // the invite and its associated room version, but we don't for this example.
+                const tempRoom = await Room.createRoomForRemoteJoin(
+                    client.userId,
+                    packet.targetRoomId,
+                    getRoomVersionImpl(DefaultRoomVersion),
+                    this.keyStore,
+                );
+                const event = await tempRoom.joinHelper(client.userId);
+
+                // XXX: We're not supposed to parse room IDs
+                const owner = getDomainFromId(packet.targetRoomId);
+
+                const federation = new FederationClient(owner);
+                await federation.sendEvents([event]);
+            } catch (e) {
+                console.error(e);
+                this.sendToClient(client, {
+                    type: PacketType.Error,
+                    message: "Unknown room",
+                    originalPacket: packet,
+                } as ErrorPacket);
+            }
         } else {
             try {
                 const membershipEvent = await room.joinHelper(client.userId);
@@ -163,6 +195,13 @@ export class ClientServerApi {
                     if (targetClient) {
                         this.sendEventToClient(targetClient, membershipEvent);
                     }
+
+                    const targetDomain = getDomainFromId(packet.targetUserId);
+                    if (targetDomain !== Runtime.signingKey.serverName) {
+                        console.log(`Sending invite to ${packet.targetUserId} over federation`);
+                        const federation = new FederationClient(targetDomain);
+                        await federation.sendInvite(membershipEvent, room.versionString);
+                    }
                 }
             } catch (e) {
                 this.sendToClient(client, {
@@ -174,7 +213,7 @@ export class ClientServerApi {
         }
     }
 
-    private userSend(client: ChatClient, packet: SendPacket) {
+    private async userSend(client: ChatClient, packet: SendPacket) {
         const room = this.roomServer.getRoom(packet.roomId);
         if (!room) {
             this.sendToClient(client, {
@@ -190,7 +229,7 @@ export class ClientServerApi {
                 content: packet.content,
             });
             try {
-                room.sendEvent(event);
+                await room.sendEvent(event);
                 this.sendToClients(room, {type: PacketType.Event, event: event} as EventPacket);
             } catch (e) {
                 this.sendToClient(client, {

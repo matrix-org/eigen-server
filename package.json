@@ -10,6 +10,7 @@
   "dependencies": {
     "ajv": "^8.12.0",
     "ajv-errors": "^3.0.0",
+    "body-parser": "^1.20.2",
     "canonicalize": "^1.0.8",
     "express": "^4.18.2",
     "express-ws": "^5.0.2",
