@@ -44,6 +44,7 @@ export class FederationClient {
         if (res.status !== 200) {
             throw new Error("Failed to send invite to server: " + (await res.text()));
         }
+        await res.text(); // consume response
     }
 
     public async sendEvents(events: MatrixEvent[]): Promise<void> {
@@ -55,7 +56,8 @@ export class FederationClient {
             },
         });
         if (res.status !== 200) {
-            throw new Error("Failed to send invite to server: " + (await res.text()));
+            throw new Error("Failed to send events to server: " + (await res.text()));
         }
+        await res.text(); // consume response
     }
 }

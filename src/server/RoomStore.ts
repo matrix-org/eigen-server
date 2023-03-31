@@ -15,4 +15,8 @@ export class RoomStore {
     public getRoom(roomId: string): Room | undefined {
         return this.rooms.find(r => r.roomId === roomId);
     }
+
+    public addRoom(room: Room) {
+        this.rooms.push(room);
+    }
 }

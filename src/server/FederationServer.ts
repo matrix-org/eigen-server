@@ -72,19 +72,28 @@ export class FederationServer {
                 continue;
             }
 
-            const room = this.roomStore.getRoom(roomId);
+            let room = this.roomStore.getRoom(roomId);
             if (!room) {
-                rejected.push(event);
-                continue;
+                if (event["type"] === "m.room.create") {
+                    room = await Room.createRoomFromCreateEvent(event, this.keyStore);
+                }
+                if (!room) {
+                    rejected.push(event);
+                    continue;
+                } else {
+                    this.roomStore.addRoom(room);
+                    this.csApi.sendEventsToClients(room, [event]);
+                    continue; // don't try to add the m.room.create event to the room
+                }
             }
 
             // TODO: Ensure we route invites correctly - https://github.com/matrix-org/linearized-matrix/issues/19
 
             try {
-                await room.sendEvent(event);
+                await room.sendEvent(event, true);
                 this.csApi.sendEventsToClients(room, [event]);
-                // TODO: Fan out - https://github.com/matrix-org/linearized-matrix/issues/20
             } catch (e) {
+                console.error(e);
                 rejected.push(event);
                 return res.status(500).json({
                     errcode: "M_UNKNOWN",
@@ -92,5 +101,7 @@ export class FederationServer {
                 });
             }
         }
+
+        res.json({});
     }
 }

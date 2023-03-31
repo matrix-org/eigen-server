@@ -229,9 +229,15 @@ export class ClientServerApi {
                 content: packet.content,
             });
             try {
-                await room.sendEvent(event);
-                this.sendToClients(room, {type: PacketType.Event, event: event} as EventPacket);
+                if (room.ownerDomain !== Runtime.signingKey.serverName) {
+                    const federation = new FederationClient(room.ownerDomain);
+                    await federation.sendEvents([event]);
+                } else {
+                    await room.sendEvent(event, true);
+                    this.sendToClients(room, {type: PacketType.Event, event: event} as EventPacket);
+                }
             } catch (e) {
+                console.error(e);
                 this.sendToClient(client, {
                     type: PacketType.Error,
                     message: (e as Error)?.message ?? "Unknown error",

@@ -7,6 +7,7 @@ import {DefaultRoomVersion, getRoomVersionImpl} from "../room_versions/map";
 import {calculateContentHash} from "../util/hashing";
 import {Runtime} from "../Runtime";
 import {KeyStore} from "../KeyStore";
+import {FederationClient} from "../FederationClient";
 
 export class Room {
     private events: MatrixEvent[] = [];
@@ -57,11 +58,69 @@ export class Room {
      *
      * Operates asynchronously.
      * @param event The event to send
+     * @param fanout True to send the event over federation if the current
+     * server is the room owner. False otherwise (default).
      */
-    public async sendEvent(event: MatrixEvent): Promise<void> {
+    public async sendEvent(event: MatrixEvent, fanout = false): Promise<void> {
+        const remote = getDomainFromId(event.sender);
+        if (
+            remote != Runtime.signingKey.serverName &&
+            event.owner_server === this.ownerDomain &&
+            this.ownerDomain === Runtime.signingKey.serverName
+        ) {
+            // We need to sign this too, as owners
+            const redacted = this.roomVersion.redact(event);
+            const signed = Runtime.signingKey.signJson(redacted);
+            event = {...event, signatures: signed.signatures};
+        }
+
         await this.roomVersion.checkValidity(event, this.keyStore);
         this.roomVersion.checkAuth(event, this.events);
         this.events.push(event);
+
+        if (fanout && this.ownerDomain === Runtime.signingKey.serverName) {
+            const joinedMembers = this.currentState
+                .getAll("m.room.member")
+                .filter(m => m.content["membership"] === "join");
+            const joinedServers = new Set(joinedMembers.map(m => getDomainFromId(m.state_key!)));
+            joinedServers.delete(this.ownerDomain); // we don't want to send to ourselves
+
+            if (
+                event.type === "m.room.member" &&
+                event.content["membership"] === "join" &&
+                remote !== this.ownerDomain
+            ) {
+                // a server might have just joined - try to find the previous membership event
+                let prevEvent: MatrixEvent | undefined;
+                for (const pEvent of this.events) {
+                    if (pEvent.type === "m.room.member" && pEvent.state_key === event.state_key && pEvent !== event) {
+                        prevEvent = pEvent;
+                    }
+                }
+                // XXX: This check assumes there's only ever 1 user from each server, so we'd end up
+                // sending the create event (and others) multiple times if there were multiple users.
+                if (!prevEvent || prevEvent.content["membership"] === "invite") {
+                    try {
+                        console.log(`Sharing history with ${remote} because they just joined the room`);
+                        // TODO: History visibility - https://github.com/matrix-org/linearized-matrix/issues/21
+                        const federation = new FederationClient(remote);
+                        await federation.sendEvents(this.events.filter(e => e !== event)); // we'll send the current event in a moment
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+            }
+
+            for (const domain of joinedServers) {
+                try {
+                    console.log(`Sending ${event.type} to ${domain}`);
+                    const federation = new FederationClient(domain);
+                    await federation.sendEvents([event]);
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        }
     }
 
     public createEventFrom(
@@ -112,6 +171,18 @@ export class Room {
         });
         await this.sendEvent(membershipEvent);
         return membershipEvent;
+    }
+
+    public static async createRoomFromCreateEvent(event: MatrixEvent, keyStore: KeyStore): Promise<Room | undefined> {
+        const version = event["content"]?.["room_version"];
+        const impl = getRoomVersionImpl(version);
+        if (!impl) {
+            return undefined;
+        }
+
+        const room = new Room(event["room_id"], impl, keyStore);
+        await room.sendEvent(event);
+        return room;
     }
 
     public static async createRoomForRemoteJoin(
