@@ -9,13 +9,13 @@ export function redactObject(obj: any, config: RedactConfig): any {
     for (const field of config.keepTopLevel) {
         newObj[field] = obj[field];
     }
-    for (const [field, keepConfig] of Object.entries(config.keepUnder)) {
-        if (typeof obj[field] !== "object") {
-            throw new Error("Expected to redact an object, but received a non-object");
-        }
-        const keep = keepConfig[obj["type"]];
-        if (!!keep) {
-            newObj[field] = redactObject(obj[field], {keepTopLevel: keep, keepUnder: {}});
+    const keep = config.keepUnder[obj["type"]];
+    if (!!keep) {
+        for (const [field, fields] of Object.entries(keep)) {
+            if (typeof obj[field] !== "object") {
+                throw new Error(`Expected to redact an object at ${field}, but received a non-object`);
+            }
+            newObj[field] = redactObject(obj[field], {keepTopLevel: fields, keepUnder: {}});
         }
     }
     return newObj;
