@@ -23,6 +23,16 @@ export class KeyStore {
     }
 
     private async getServerKeys(domain: string): Promise<ServerKeys> {
+        if (domain === Runtime.signingKey.serverName) {
+            return {
+                expiresAt: 0,
+                verifyKeys: {
+                    [`ed25519:${Runtime.signingKey.keyId}`]: unpaddedBase64Encode(
+                        Buffer.from(Runtime.signingKey.publicKey),
+                    ),
+                },
+            };
+        }
         if (this.cachedKeys.has(domain)) {
             const keys = this.cachedKeys.get(domain)!;
             if (new Date().getTime() >= keys.expiresAt) {
