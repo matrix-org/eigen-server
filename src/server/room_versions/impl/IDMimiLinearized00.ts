@@ -218,6 +218,7 @@ export class IDMimiLinearized00 implements RoomVersion {
                 );
                 delete linearizedPdu["auth_events"];
                 delete linearizedPdu["prev_events"];
+                delete linearizedPdu["hashes"];
 
                 // Verify LPDU signature from origin
                 redacted = this.redact(linearizedPdu);

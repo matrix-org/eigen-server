@@ -118,6 +118,7 @@ export class FederationClient {
         const lpdu = JSON.parse(JSON.stringify(event));
         delete lpdu["auth_events"];
         delete lpdu["prev_events"];
+        delete lpdu["hashes"];
 
         // sign it
         const redacted = version.redact(lpdu);
