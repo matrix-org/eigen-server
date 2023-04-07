@@ -201,7 +201,13 @@ export class HubRoom extends ParticipantRoom {
             throw new Error("Mismatched event ID");
         }
 
-        const event: MatrixEvent = {...join, event_id: eventId};
+        // Hash & sign the event.
+        const hashed = calculateContentHash(join);
+        const signed = Runtime.signingKey.signJson(redacted);
+        const realPdu: PDU = {...join, hashes: hashed.hashes, signatures: signed.signatures};
+
+        // Create the event and add it to the room.
+        const event: MatrixEvent = {...realPdu, event_id: eventId};
         await this.reallySendEvent(event);
 
         // TODO: This is horribly inefficient
