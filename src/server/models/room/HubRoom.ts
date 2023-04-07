@@ -266,38 +266,38 @@ export class HubRoom extends ParticipantRoom {
             }),
         );
         await room.doJoin(creatorUserId);
-        await room.sendEvent(
-            room.createEvent({
-                type: "m.room.power_levels",
-                state_key: "",
-                sender: creatorUserId,
-                content: {
-                    // Note: these values are deliberately non-default and are a best value approximation
-                    ban: 50,
-                    kick: 50,
-                    invite: 50, // default 0
-                    redact: 50,
-                    notifications: {
-                        room: 50,
-                    },
-                    event_default: 0,
-                    state_default: 50,
-                    events: {
-                        // by default no events are specified in this map
-                        "m.room.encryption": 100,
-                        "m.room.history_visibility": 100,
-                        "m.room.power_levels": 100,
-                        "m.room.server_acl": 100,
-                        "m.room.tombstone": 100,
-                    },
-                    users_default: 0,
-                    users: {
-                        // by default no users are specified in this map
-                        [creatorUserId]: 100,
-                    },
-                },
-            }),
-        );
+        // await room.sendEvent(
+        //     room.createEvent({
+        //         type: "m.room.power_levels",
+        //         state_key: "",
+        //         sender: creatorUserId,
+        //         content: {
+        //             // Note: these values are deliberately non-default and are a best value approximation
+        //             ban: 50,
+        //             kick: 50,
+        //             invite: 50, // default 0
+        //             redact: 50,
+        //             notifications: {
+        //                 room: 50,
+        //             },
+        //             event_default: 0,
+        //             state_default: 50,
+        //             events: {
+        //                 // by default no events are specified in this map
+        //                 "m.room.encryption": 100,
+        //                 "m.room.history_visibility": 100,
+        //                 "m.room.power_levels": 100,
+        //                 "m.room.server_acl": 100,
+        //                 "m.room.tombstone": 100,
+        //             },
+        //             users_default: 0,
+        //             users: {
+        //                 // by default no users are specified in this map
+        //                 [creatorUserId]: 100,
+        //             },
+        //         },
+        //     }),
+        // );
         await room.sendEvent(
             room.createEvent({
                 type: "m.room.join_rules",
