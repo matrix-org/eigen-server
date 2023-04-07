@@ -1,6 +1,6 @@
 import express, {Express} from "express";
 import {RoomStore} from "./RoomStore";
-import {PDU} from "./models/event";
+import {MatrixEvent, PDU} from "./models/event";
 import {getRoomVersionImpl} from "./room_versions/map";
 import {KeyStore} from "./KeyStore";
 import {HubRoom} from "./models/room/HubRoom";
@@ -17,6 +17,7 @@ export class FederationServer {
         app.put("/_matrix/federation/v2/invite/:roomId/:eventId", this.onInviteRequest.bind(this));
         app.get("/_matrix/federation/v1/make_join/:roomId/:userId", this.onMakeJoinRequest.bind(this));
         app.put("/_matrix/federation/v2/send_join/:roomId/:eventId", this.onSendJoinRequest.bind(this));
+        app.get("/_matrix/federation/v1/event_auth/:roomId/:eventId", this.onEventAuthRequest.bind(this));
     }
 
     private async onInviteRequest(req: express.Request, res: express.Response) {
@@ -205,5 +206,40 @@ export class FederationServer {
             console.error(e);
             return res.status(500).json({errcode: "M_UNKNOWN", error: "see logs"});
         }
+    }
+
+    private async onEventAuthRequest(req: express.Request, res: express.Response) {
+        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Check that server can receive this event.
+
+        console.error(`Received event_auth request for ${req.params["roomId"]} for ${req.params["eventId"]}`);
+
+        if (typeof req.body !== "object") {
+            return res.status(400).json({errcode: "M_BAD_JSON"}); // we assume it was JSON, at least
+        }
+
+        const room = this.roomStore.getRoom(req.params["roomId"]);
+        if (!room) {
+            return res.status(404).json({errcode: "M_NOT_FOUND"});
+        }
+
+        const event = room.getEvent(req.params["eventId"]);
+        if (!event) {
+            return res.status(404).json({errcode: "M_NOT_FOUND"});
+        }
+
+        const toPdu = (e: MatrixEvent): PDU => {
+            const clone = JSON.parse(JSON.stringify(e));
+            delete clone["event_id"];
+            return clone;
+        };
+
+        res.status(200).json({
+            auth_chain: event.auth_events
+                .map(authEventId => room.getEvent(authEventId))
+                .filter(e => !!e)
+                // @ts-ignore
+                .map(toPdu),
+        });
     }
 }

@@ -113,6 +113,15 @@ export class ParticipantRoom implements Room {
         this.emitter.emit("event", fullEvent);
     }
 
+    public getEvent(eventId: string): MatrixEvent | null {
+        for (const event of this.events) {
+            if (event.event_id == eventId) {
+                return event;
+            }
+        }
+        return null;
+    }
+
     public on(event: "event", fn: (event: MatrixEvent) => void): void;
     public on(event: string, fn: (...args: any[]) => void): void {
         this.emitter.on(event, fn);
