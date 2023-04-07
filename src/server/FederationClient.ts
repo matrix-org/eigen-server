@@ -30,23 +30,39 @@ export class FederationClient {
         return await (await fetch(`${(await this.getUrl()).httpsUrl}/_matrix/key/v2/server`)).json();
     }
 
-    // TODO: Send auth header for non-key requests - https://github.com/matrix-org/linearized-matrix/issues/17
+    private getAuthHeader(method: string, uri: string, content: any | undefined = undefined): string {
+        const json = {
+            method: "PUT",
+            uri: uri,
+            origin: Runtime.signingKey.serverName,
+            destination: this.forDomain,
+        };
+        if (content !== undefined) {
+            // @ts-ignore
+            json.content = content;
+        }
+        const signed = Runtime.signingKey.signJson(json);
+        const signature = signed["signatures"][Runtime.signingKey.serverName]["ed25519:" + Runtime.signingKey.keyId];
+        return `X-Matrix origin="${Runtime.signingKey.serverName}",destination="${this.forDomain}",key="ed25519:${Runtime.signingKey.keyId}",sig="${signature}"`;
+    }
 
     public async sendInvite(event: PDU, roomVersion: string): Promise<PDU> {
         const version = getRoomVersionImpl(roomVersion)!;
         const eventId = `$${calculateReferenceHash(version.redact(event))}`;
-        const res = await fetch(
-            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v2/invite/${encodeURIComponent(
-                event.room_id,
-            )}/${encodeURIComponent(eventId)}`,
-            {
-                method: "PUT",
-                body: JSON.stringify({event: event, room_version: roomVersion}),
-                headers: {
-                    "Content-Type": "application/json",
-                },
+        const path = `/_matrix/federation/v2/invite/${encodeURIComponent(event.room_id)}/${encodeURIComponent(
+            eventId,
+        )}`;
+        const content = {event: event, room_version: roomVersion};
+
+        const res = await fetch(`${(await this.getUrl()).httpsUrl}${path}`, {
+            method: "PUT",
+            body: JSON.stringify(content),
+            headers: {
+                "Content-Type": "application/json",
+                // TODO Support multiple keys.
+                Authorization: this.getAuthHeader("PUT", path, content),
             },
-        );
+        });
         if (res.status !== 200) {
             throw new Error("Failed to send invite to server: " + (await res.text()));
         }
@@ -58,22 +74,23 @@ export class FederationClient {
             .update(events.map(e => e.event_id).join("|"))
             .digest()
             .toString("hex")}`;
-        const res = await fetch(
-            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v1/send/${encodeURIComponent(txnId)}`,
-            {
-                method: "PUT",
-                body: JSON.stringify({
-                    pdus: events.map(e => {
-                        const p: PDU & {event_id?: string} = JSON.parse(JSON.stringify(e)); // clone
-                        delete p["event_id"];
-                        return p;
-                    }),
-                }),
-                headers: {
-                    "Content-Type": "application/json",
-                },
+        const path = `/_matrix/federation/v1/send/${encodeURIComponent(txnId)}`;
+        const content = {
+            pdus: events.map(e => {
+                const p: PDU & {event_id?: string} = JSON.parse(JSON.stringify(e)); // clone
+                delete p["event_id"];
+                return p;
+            }),
+        };
+        const res = await fetch(`${(await this.getUrl()).httpsUrl}${path}`, {
+            method: "PUT",
+            body: JSON.stringify(content),
+            headers: {
+                "Content-Type": "application/json",
+                // TODO Support multiple keys.
+                Authorization: this.getAuthHeader("PUT", path, content),
             },
-        );
+        });
         if (res.status !== 200) {
             throw new Error("Failed to send events to server: " + (await res.text()));
         }
@@ -85,16 +102,18 @@ export class FederationClient {
     }
 
     public async acceptInvite(inviteEvent: PDU): Promise<[PDU[], PDU]> {
-        let res = await fetch(
-            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v1/make_join/${encodeURIComponent(
-                inviteEvent.room_id,
-            )}/${encodeURIComponent(inviteEvent.state_key!)}?${getSupportedVersions()
-                .map(v => `ver=${encodeURIComponent(v)}`)
-                .join("&")}`,
-            {
-                method: "GET",
+        const makeJoinPath = `/_matrix/federation/v1/make_join/${encodeURIComponent(
+            inviteEvent.room_id,
+        )}/${encodeURIComponent(inviteEvent.state_key!)}?${getSupportedVersions()
+            .map(v => `ver=${encodeURIComponent(v)}`)
+            .join("&")}`;
+        let res = await fetch(`${(await this.getUrl()).httpsUrl}${makeJoinPath}`, {
+            method: "GET",
+            headers: {
+                // TODO Support multiple keys.
+                Authorization: this.getAuthHeader("GET", makeJoinPath),
             },
-        );
+        });
         let json = await res.json();
         const event: PDU = json.event;
         const roomVersion = json.room_version;
@@ -127,18 +146,19 @@ export class FederationClient {
         const eventId = `$${calculateReferenceHash(redactedPdu)}`;
 
         // submit it
-        res = await fetch(
-            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v2/send_join/${encodeURIComponent(
-                inviteEvent.room_id,
-            )}/${encodeURIComponent(eventId)}`,
-            {
-                method: "PUT",
-                body: JSON.stringify({...event, signatures: signed.signatures}),
-                headers: {
-                    "Content-Type": "application/json",
-                },
+        const sendJoinPath = `/_matrix/federation/v2/send_join/${encodeURIComponent(
+            inviteEvent.room_id,
+        )}/${encodeURIComponent(eventId)}`;
+        const content = {...event, signatures: signed.signatures};
+        res = await fetch(`${(await this.getUrl()).httpsUrl}${sendJoinPath}`, {
+            method: "PUT",
+            body: JSON.stringify(content),
+            headers: {
+                "Content-Type": "application/json",
+                // TODO Support multiple keys.
+                Authorization: this.getAuthHeader("PUT", sendJoinPath, content),
             },
-        );
+        });
         json = await res.json();
         const finalEvent = json["event"] ?? event;
         const stateBefore = json["state"];
