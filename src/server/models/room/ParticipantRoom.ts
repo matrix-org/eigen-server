@@ -110,6 +110,7 @@ export class ParticipantRoom implements Room {
             event_id: `$${calculateReferenceHash(this.roomVersion.redact(event))}`,
         };
         this.events.push(fullEvent); // TODO: Splice properly - https://github.com/matrix-org/linearized-matrix/issues/24
+        this.emitter.emit("event", fullEvent);
     }
 
     public on(event: "event", fn: (event: MatrixEvent) => void): void;
