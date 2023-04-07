@@ -25,12 +25,12 @@ export class RoomStore {
         this.emitter.emit("room", room);
     }
 
-    public on(event: "room", fn: (room: HubRoom) => void): void;
+    public on(event: "room", fn: (room: ParticipantRoom) => void): void;
     public on(event: string, fn: (...args: any[]) => void): void {
         this.emitter.on(event, fn);
     }
 
-    public off(event: "room", fn: (room: HubRoom) => void): void;
+    public off(event: "room", fn: (room: ParticipantRoom) => void): void;
     public off(event: string, fn: (...args: any[]) => void): void {
         this.emitter.off(event, fn);
     }

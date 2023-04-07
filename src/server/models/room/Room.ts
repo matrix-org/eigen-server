@@ -4,6 +4,7 @@ export interface Room {
     readonly version: string;
     readonly roomId: string;
     readonly hubDomain: string;
+    readonly joinedUserIds: string[];
     sendEvent(event: LinearizedPDU): Promise<void>;
     createEvent(partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts" | "event_id">): LinearizedPDU;
     doJoin(userId: string): Promise<void>;

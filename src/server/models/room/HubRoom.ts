@@ -14,13 +14,6 @@ export class HubRoom extends ParticipantRoom {
         return [...this.events];
     }
 
-    public get joinedUserIds(): string[] {
-        return this.currentState
-            .getAll("m.room.member")
-            .filter(m => m.content["membership"] === "join")
-            .map(m => m.state_key!);
-    }
-
     public async sendEvent(event: LinearizedPDU): Promise<void> {
         if (this.hubDomain !== Runtime.signingKey.serverName) {
             throw new Error("Runtime error: Asked to send an event as a hub but we're not the hub");

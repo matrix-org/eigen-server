@@ -39,6 +39,13 @@ export class ParticipantRoom implements Room {
         return this.roomVersion.id;
     }
 
+    public get joinedUserIds(): string[] {
+        return this.currentState
+            .getAll("m.room.member")
+            .filter(m => m.content["membership"] === "join")
+            .map(m => m.state_key!);
+    }
+
     public createEvent(
         partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts" | "event_id">,
     ): LinearizedPDU {

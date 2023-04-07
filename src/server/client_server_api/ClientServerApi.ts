@@ -14,10 +14,10 @@ import {
     SendPacket,
 } from "./packets";
 import expressWs from "express-ws";
-import {HubRoom} from "../models/room/HubRoom";
 import {RoomStore} from "../RoomStore";
 import {MatrixEvent, PDU} from "../models/event";
 import {InviteStore} from "../InviteStore";
+import {ParticipantRoom} from "../models/room/ParticipantRoom";
 
 interface ChatClient {
     ws: WebSocket;
@@ -32,7 +32,7 @@ export class ClientServerApi {
         this.inviteStore.on("invite", this.onInvite.bind(this));
     }
 
-    private onRoom(room: HubRoom): void {
+    private onRoom(room: ParticipantRoom): void {
         room.on("event", ev => {
             this.sendEventsToClients(room, [ev]);
 
@@ -90,7 +90,7 @@ export class ClientServerApi {
         client.ws.send(JSON.stringify(packet));
     }
 
-    private sendEventsToClients(room: HubRoom, events: MatrixEvent[]) {
+    private sendEventsToClients(room: ParticipantRoom, events: MatrixEvent[]) {
         const userIds = room.joinedUserIds;
         for (const client of this.clients) {
             if (userIds.includes(client.userId)) {
