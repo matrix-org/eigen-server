@@ -229,6 +229,7 @@ export class IDMimiLinearized00 implements RoomVersion {
             }
         } else {
             // Verify sender signed PDU
+            const origin = getDomainFromId(event.sender);
             let redacted = this.redact(event);
             if (!(await keyStore.validateDomainSignature(redacted, origin))) {
                 throw new Error(`${event.type}: Validation Failed: Signature error on origin (normal PDU)`);
