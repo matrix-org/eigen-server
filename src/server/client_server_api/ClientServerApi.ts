@@ -179,12 +179,14 @@ export class ClientServerApi {
             } as ErrorPacket);
         } else {
             try {
-                room.createEvent({
-                    type: packet.eventType,
-                    state_key: packet.stateKey,
-                    sender: client.userId,
-                    content: packet.content,
-                });
+                await room.sendEvent(
+                    room.createEvent({
+                        type: packet.eventType,
+                        state_key: packet.stateKey,
+                        sender: client.userId,
+                        content: packet.content,
+                    }),
+                );
             } catch (e) {
                 console.error(e);
                 this.sendToClient(client, {
