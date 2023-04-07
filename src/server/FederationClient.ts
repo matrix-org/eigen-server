@@ -114,10 +114,16 @@ export class FederationClient {
             throw new Error("make_join produced invalid join event");
         }
 
+        // create the LPDU
+        const lpdu = JSON.parse(JSON.stringify(event));
+        delete lpdu["auth_events"];
+        delete lpdu["prev_events"];
+
         // sign it
-        const redacted = version.redact(event);
+        const redacted = version.redact(lpdu);
+        const redactedPdu = version.redact(event);
         const signed = Runtime.signingKey.signJson(redacted);
-        const eventId = `$${calculateReferenceHash(redacted)}`;
+        const eventId = `$${calculateReferenceHash(redactedPdu)}`;
 
         // submit it
         res = await fetch(

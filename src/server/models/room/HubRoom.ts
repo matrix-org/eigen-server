@@ -167,7 +167,7 @@ export class HubRoom extends ParticipantRoom {
         this.events.push(event);
     }
 
-    public createJoinTemplate(userId: string): LinearizedPDU | undefined {
+    public createJoinTemplate(userId: string): PDU | undefined {
         const ev = this.formalizeEvent(
             this.createEvent({
                 type: "m.room.member",
@@ -185,12 +185,9 @@ export class HubRoom extends ParticipantRoom {
             return undefined;
         }
 
-        const lpdu: LinearizedPDU & Partial<Omit<MatrixEvent, keyof LinearizedPDU>> = ev;
-        delete lpdu["event_id"];
-        delete lpdu["auth_events"];
-        delete lpdu["prev_events"];
-
-        return lpdu;
+        const pdu: PDU & Partial<Omit<MatrixEvent, keyof PDU>> = ev;
+        delete pdu["event_id"];
+        return pdu;
     }
 
     public async doSendJoin(join: PDU, expectedEventId: string): Promise<{chain: PDU[]; event: PDU; state: PDU[]}> {
