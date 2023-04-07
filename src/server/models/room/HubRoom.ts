@@ -179,7 +179,18 @@ export class HubRoom extends ParticipantRoom {
         }
 
         const pdu: PDU & Partial<Omit<MatrixEvent, keyof PDU>> = ev;
+        // Remove the event ID, hashes, signatures, and unsigned.
         delete pdu["event_id"];
+        // @ts-ignore
+        delete pdu["unsigned"];
+        // @ts-ignore
+        delete pdu["signatures"];
+        // @ts-ignore
+        delete pdu["hashes"];
+
+        // We don't know if the server asking to join uses a hub or not.
+        delete pdu["hub_server"];
+
         return pdu;
     }
 
