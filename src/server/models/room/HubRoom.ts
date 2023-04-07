@@ -111,29 +111,33 @@ export class HubRoom extends ParticipantRoom {
     }
 
     public async reallySendEvent(event: MatrixEvent): Promise<void> {
-        const remote = getDomainFromId(event.sender);
-        if (event.type === "m.room.member" && event.content["membership"] === "invite" && remote !== this.hubDomain) {
-            const isJoined = this.joinedUserIds.some(i => i.endsWith(`:${remote}`));
-            if (!isJoined) {
-                const federation = new FederationClient(remote);
-                const pdu = await federation.sendInvite(event, this.version);
-                const redacted = this.roomVersion.redact(pdu);
+        if (event.type === "m.room.member" && event.content["membership"] === "invite") {
+            const remote = getDomainFromId(event.state_key!);
+            if (remote !== this.hubDomain) {
+                const isJoined = this.joinedUserIds.some(i => i.endsWith(`:${remote}`));
+                if (!isJoined) {
+                    const federation = new FederationClient(remote);
+                    const initPdu: PDU & Partial<Omit<MatrixEvent, keyof PDU>> = {...event};
+                    delete initPdu.event_id;
+                    const pdu = await federation.sendInvite(initPdu, this.version);
+                    const redacted = this.roomVersion.redact(pdu);
 
-                // Sanity check the returned PDU
-                if (
-                    pdu.type !== "m.room.member" ||
-                    pdu.content["membership"] !== "invite" ||
-                    pdu.state_key !== event.state_key ||
-                    pdu.sender !== event.sender
-                ) {
-                    throw new Error("Failed post-invite validation: field mismatch");
-                }
-                if (!(await this.keyStore.validateDomainSignature(redacted, Runtime.signingKey.serverName))) {
-                    throw new Error("Failed post-invite validation: event not signed by us");
-                }
+                    // Sanity check the returned PDU
+                    if (
+                        pdu.type !== "m.room.member" ||
+                        pdu.content["membership"] !== "invite" ||
+                        pdu.state_key !== event.state_key ||
+                        pdu.sender !== event.sender
+                    ) {
+                        throw new Error("Failed post-invite validation: field mismatch");
+                    }
+                    if (!(await this.keyStore.validateDomainSignature(redacted, Runtime.signingKey.serverName))) {
+                        throw new Error("Failed post-invite validation: event not signed by us");
+                    }
 
-                const eventId = `$${calculateReferenceHash(redacted)}`;
-                event = {...pdu, event_id: eventId};
+                    const eventId = `$${calculateReferenceHash(redacted)}`;
+                    event = {...pdu, event_id: eventId};
+                }
             }
         }
 
