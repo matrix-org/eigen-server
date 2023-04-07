@@ -23,6 +23,7 @@ const PduKeepFields: RedactConfig = {
         "prev_events",
         "auth_events",
         "origin_server_ts",
+        "hub_server",
     ],
     keepUnder: {
         "m.room.member": {
