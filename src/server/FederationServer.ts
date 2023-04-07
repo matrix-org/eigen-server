@@ -82,8 +82,6 @@ export class FederationServer {
                 error: `${e && typeof e === "object" ? (e as any).message ?? `${e}` : e}`,
             });
         }
-
-        res.json({});
     }
 
     private async onTransactionRequest(req: express.Request, res: express.Response) {
