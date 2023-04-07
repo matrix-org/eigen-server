@@ -84,7 +84,7 @@ export class FederationClient {
         return this.sendEvents(events as MatrixEvent[]); // yes, we cheat badly here
     }
 
-    public async acceptInvite(inviteEvent: PDU): Promise<PDU[]> {
+    public async acceptInvite(inviteEvent: PDU): Promise<[PDU[], PDU]> {
         let res = await fetch(
             `${(await this.getUrl()).httpsUrl}/_matrix/federation/v1/make_join/${encodeURIComponent(
                 inviteEvent.room_id,
@@ -141,6 +141,8 @@ export class FederationClient {
         json = await res.json();
         const finalEvent = json["event"] ?? event;
         const stateBefore = json["state"];
-        return [...stateBefore, finalEvent]; // TODO: We assume this is ordered
+        // TODO: We assume stateBefore is ordered
+        // https://github.com/matrix-org/linearized-matrix/issues/27
+        return [stateBefore, finalEvent];
     }
 }

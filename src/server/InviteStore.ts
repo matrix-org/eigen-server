@@ -28,7 +28,7 @@ export class InviteStore {
 
         const respondToDomain = getDomainFromId(invite.sender);
         const client = new FederationClient(respondToDomain);
-        const state = await client.acceptInvite(invite);
+        const [state, joinEvent] = await client.acceptInvite(invite);
         let room: ParticipantRoom | undefined = await HubRoom.createRoomFromState(state, this.keyStore);
         if (!room) {
             throw new Error("Unable to create room");
@@ -37,6 +37,12 @@ export class InviteStore {
             room = ParticipantRoom.createFromOtherRoom(room);
         }
         this.roomStore.addRoom(room);
+
+        if (room instanceof HubRoom) {
+            await room.receivePdu(joinEvent);
+        } else {
+            room.receiveEvent(joinEvent);
+        }
 
         this.pending = this.pending.filter(i => i !== invite);
     }
