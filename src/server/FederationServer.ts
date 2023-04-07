@@ -16,7 +16,7 @@ export class FederationServer {
         app.put("/_matrix/federation/v1/send/:txnId", this.onTransactionRequest.bind(this));
         app.put("/_matrix/federation/v2/invite/:roomId/:eventId", this.onInviteRequest.bind(this));
         app.get("/_matrix/federation/v1/make_join/:roomId/:userId", this.onMakeJoinRequest.bind(this));
-        app.get("/_matrix/federation/v2/send_join/:roomId/:eventId", this.onSendJoinRequest.bind(this));
+        app.put("/_matrix/federation/v2/send_join/:roomId/:eventId", this.onSendJoinRequest.bind(this));
     }
 
     private async onInviteRequest(req: express.Request, res: express.Response) {
