@@ -1,5 +1,9 @@
 import {FederationConnectionCache, FederationUrl} from "./FederationConnectionCache";
-import {MatrixEvent} from "./models/event";
+import {LinearizedPDU, MatrixEvent, PDU} from "./models/event";
+import {getRoomVersionImpl, getSupportedVersions} from "./room_versions/map";
+import {calculateReferenceHash} from "./util/hashing";
+import {createHash} from "crypto";
+import {Runtime} from "./Runtime";
 
 export class FederationClient {
     private url?: FederationUrl;
@@ -28,14 +32,16 @@ export class FederationClient {
 
     // TODO: Send auth header for non-key requests - https://github.com/matrix-org/linearized-matrix/issues/17
 
-    public async sendInvite(event: MatrixEvent, roomVersion: string): Promise<void> {
+    public async sendInvite(event: PDU, roomVersion: string): Promise<PDU> {
+        const version = getRoomVersionImpl(roomVersion)!;
+        const eventId = `$${calculateReferenceHash(version.redact(event))}`;
         const res = await fetch(
-            `${(await this.getUrl()).httpsUrl}/_matrix/linearized/unstable/invite?room_version=${encodeURIComponent(
-                roomVersion,
-            )}`,
+            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v2/invite/${encodeURIComponent(
+                event.room_id,
+            )}/${encodeURIComponent(eventId)}`,
             {
-                method: "POST",
-                body: JSON.stringify(event),
+                method: "PUT",
+                body: JSON.stringify({event: event, room_version: roomVersion}),
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -44,20 +50,91 @@ export class FederationClient {
         if (res.status !== 200) {
             throw new Error("Failed to send invite to server: " + (await res.text()));
         }
-        await res.text(); // consume response
+        return (await res.json()).event;
     }
 
     public async sendEvents(events: MatrixEvent[]): Promise<void> {
-        const res = await fetch(`${(await this.getUrl()).httpsUrl}/_matrix/linearized/unstable/send`, {
-            method: "POST",
-            body: JSON.stringify(events),
-            headers: {
-                "Content-Type": "application/json",
+        const txnId = `${new Date().getTime()}${createHash("sha256")
+            .update(events.map(e => e.event_id).join("|"))
+            .digest()
+            .toString("hex")}`;
+        const res = await fetch(
+            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v1/send/${encodeURIComponent(txnId)}`,
+            {
+                method: "PUT",
+                body: JSON.stringify({
+                    pdus: events.map(e => {
+                        const p: PDU & {event_id?: string} = JSON.parse(JSON.stringify(e)); // clone
+                        delete p["event_id"];
+                        return p;
+                    }),
+                }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
             },
-        });
+        );
         if (res.status !== 200) {
             throw new Error("Failed to send events to server: " + (await res.text()));
         }
         await res.text(); // consume response
+    }
+
+    public async sendLinearizedPdus(events: LinearizedPDU[]): Promise<void> {
+        return this.sendEvents(events as MatrixEvent[]); // yes, we cheat badly here
+    }
+
+    public async acceptInvite(inviteEvent: PDU): Promise<PDU[]> {
+        let res = await fetch(
+            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v1/make_join/${encodeURIComponent(
+                inviteEvent.room_id,
+            )}/${encodeURIComponent(inviteEvent.state_key!)}?${getSupportedVersions()
+                .map(v => `ver=${encodeURIComponent(v)}`)
+                .join("&")}`,
+            {
+                method: "GET",
+            },
+        );
+        let json = await res.json();
+        const event: PDU = json.event;
+        const roomVersion = json.room_version;
+        const version = getRoomVersionImpl(roomVersion);
+        if (!version) {
+            throw new Error("Cannot accept invite: invalid room version");
+        }
+        if (typeof event !== "object") {
+            throw new Error("Invalid response");
+        }
+        if (
+            event.type !== "m.room.member" ||
+            event.sender !== inviteEvent.state_key! ||
+            event.state_key !== inviteEvent.state_key ||
+            event.content["membership"] !== "join"
+        ) {
+            throw new Error("make_join produced invalid join event");
+        }
+
+        // sign it
+        const redacted = version.redact(event);
+        const signed = Runtime.signingKey.signJson(redacted);
+        const eventId = `$${calculateReferenceHash(redacted)}`;
+
+        // submit it
+        res = await fetch(
+            `${(await this.getUrl()).httpsUrl}/_matrix/federation/v2/send_join/${encodeURIComponent(
+                inviteEvent.room_id,
+            )}/${encodeURIComponent(eventId)}`,
+            {
+                method: "PUT",
+                body: JSON.stringify({...event, signatures: signed.signatures}),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            },
+        );
+        json = await res.json();
+        const finalEvent = json["event"] ?? event;
+        const stateBefore = json["state"];
+        return [...stateBefore, finalEvent]; // TODO: We assume this is ordered
     }
 }

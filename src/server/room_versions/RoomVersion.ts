@@ -1,4 +1,4 @@
-import {MatrixEvent} from "../models/event";
+import {AnyPDU, MatrixEvent, PDU} from "../models/event";
 import {KeyStore} from "../KeyStore";
 
 export interface RoomVersion {
@@ -11,7 +11,7 @@ export interface RoomVersion {
      * @param event The event to validate.
      * @param keyStore The running key store instance
      */
-    checkValidity(event: MatrixEvent, keyStore: KeyStore): Promise<void>;
+    checkValidity(event: PDU, keyStore: KeyStore): Promise<void>;
     /**
      * Checks if an event is allowed by the authorization rules for the room version,
      * given the room as a linearized DAG (index 0 should the create event if not
@@ -20,6 +20,6 @@ export interface RoomVersion {
      * @param event The event to validate.
      * @param allEvents The events which have already been accepted, ordered.
      */
-    checkAuth(event: MatrixEvent, allEvents: MatrixEvent[]): void;
-    redact(event: MatrixEvent | Omit<MatrixEvent, "signatures">): object;
+    checkAuth(event: PDU, allEvents: MatrixEvent[]): void;
+    redact(event: AnyPDU | Omit<AnyPDU, "signatures">): object;
 }

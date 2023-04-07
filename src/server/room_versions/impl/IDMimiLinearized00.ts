@@ -1,5 +1,5 @@
 import {RoomVersion} from "../RoomVersion";
-import {MatrixEvent, OnlyV4PDUFields, V4PDU} from "../../models/event";
+import {AnyPDU, LinearizedPDU, MatrixEvent, PDU} from "../../models/event";
 import {CurrentRoomState} from "../../models/CurrentRoomState";
 import {getDomainFromId} from "../../util/id";
 import {PowerLevels} from "../../models/PowerLevels";
@@ -20,19 +20,16 @@ const PduKeepFields: RedactConfig = {
         "content",
         "hashes",
         "signatures",
-        "depth",
         "prev_events",
         "auth_events",
-        "origin",
         "origin_server_ts",
-        "membership",
     ],
     keepUnder: {
         "m.room.member": {
             content: ["membership", "join_authorised_via_users_server"],
         },
         "m.room.create": {
-            content: ["creator"],
+            content: ["room_version"], // TODO: Other fields too
         },
         "m.room.join_rules": {
             content: ["join_rule", "allow"],
@@ -52,6 +49,12 @@ AjvErrors(ajv);
 const EventSchema: Schema = {
     type: "object",
     properties: {
+        event_id: {
+            type: "string",
+            minLength: 2, // sigil + characters, in theory
+            pattern: "^\\$.+$",
+            nullable: false,
+        },
         room_id: {
             type: "string",
             minLength: 4, // sigil + colon + characters, in theory
@@ -83,12 +86,7 @@ const EventSchema: Schema = {
             // weird for JSON Schema.
             nullable: false,
         },
-        owner_server: {
-            type: "string",
-            nullable: false,
-            minLength: 3, // "a.b" at a minimum
-        },
-        delegated_server: {
+        hub_server: {
             type: "string",
             nullable: false,
             minLength: 3, // "a.b" at a minimum
@@ -150,16 +148,21 @@ const EventSchema: Schema = {
                 type: "string",
             },
         },
-        depth: {
-            type: "integer",
-            // Ideally we'd specify our 2^56 limit here, but it's a bit too
-            // weird for JSON Schema.
-            nullable: false,
-        },
     },
-    required: ["room_id", "type", "sender", "content", "origin_server_ts", "hashes", "signatures"],
+    required: [
+        "room_id",
+        "type",
+        "sender",
+        "content",
+        "origin_server_ts",
+        "hashes",
+        "signatures",
+        "auth_events",
+        "prev_events",
+    ],
     errorMessage: {
         properties: {
+            event_id: "The event ID should be a string prefixed with `$` and is required",
             room_id: "The room ID should be a string prefixed with `!` and contain a `:`, and is required",
             type: "The event type should be a string of zero or more characters, and is required",
             state_key: "The state key should be a string of zero or more characters",
@@ -167,13 +170,11 @@ const EventSchema: Schema = {
             content: "The event content should at least be a defined object, and is required",
             origin_server_ts: "The event timestamp should be a number, and is required",
             unsigned: "The event's unsigned content should be a defined object",
-            owner_server: "The owner server should be a string representing a domain",
-            delegated_server: "The delegated server should be a string representing a domain",
+            hub_server: "The hub server should be a string representing a domain and is required",
             hashes: "Hashes should be an object with a sha256 field",
             signatures: "Signatures should be an object mapping domain to key ID to signature",
-            auth_events: "Auth events must be an array of strings",
-            prev_events: "Previous events must be an array of strings",
-            depth: "Depth must be an integer",
+            auth_events: "Auth events must be an array of strings and is required",
+            prev_events: "Previous events must be an array of strings and is required",
         },
     },
 };
@@ -186,7 +187,7 @@ export class IDMimiLinearized00 implements RoomVersion {
         return IDMimiLinearized00.Identifier;
     }
 
-    public async checkValidity(event: MatrixEvent | V4PDU, keyStore: KeyStore): Promise<void> {
+    public async checkValidity(event: PDU, keyStore: KeyStore): Promise<void> {
         if (!event) {
             throw new Error("Event validation failed: no event supplied");
         }
@@ -203,43 +204,32 @@ export class IDMimiLinearized00 implements RoomVersion {
             );
         }
 
-        if (typeof event.delegated_server === "string") {
-            if (typeof event.owner_server !== "string") {
-                throw new Error(`${event.type}: Validation Failed: Missing owner_server to go with delegated_server`);
+        if (typeof event.hub_server === "string") {
+            // Verify the hub's signature
+            let redacted = this.redact(event);
+            if (!(await keyStore.validateDomainSignature(redacted, event.hub_server))) {
+                throw new Error(`${event.type}: Validation Failed: Signature error on hub_server`);
             }
 
-            // Verify PDU (whatever we received) signature
-            const redacted = this.redact(event);
-            if (!(await keyStore.validateDomainSignature(redacted, event.delegated_server))) {
-                throw new Error(`${event.type}: Validation Failed: Signature error on delegated_server`);
-            }
-        }
-        if (typeof event.owner_server === "string") {
-            const dlpdu: MatrixEvent & Partial<OnlyV4PDUFields> = JSON.parse(JSON.stringify(event));
-            delete dlpdu["auth_events"];
-            delete dlpdu["prev_events"];
-            delete dlpdu["depth"];
+            const origin = getDomainFromId(event.sender);
+            if (origin !== event.hub_server) {
+                const linearizedPdu: LinearizedPDU & Partial<Exclude<PDU, keyof LinearizedPDU>> = JSON.parse(
+                    JSON.stringify(event),
+                );
+                delete linearizedPdu["auth_events"];
+                delete linearizedPdu["prev_events"];
 
-            // Verify (D)LPDU signature
-            let redacted = this.redact(dlpdu);
-            if (!(await keyStore.validateDomainSignature(redacted, event.owner_server))) {
-                throw new Error(`${event.type}: Validation Failed: Signature error on owner_server`);
+                // Verify LPDU signature from origin
+                redacted = this.redact(linearizedPdu);
+                if (!(await keyStore.validateDomainSignature(redacted, origin))) {
+                    throw new Error(`${event.type}: Validation Failed: Signature error from origin (LPDU)`);
+                }
             }
-
-            // Verify sender signature
-            delete dlpdu["delegated_server"]; // convert to LPDU for this check
-            redacted = this.redact(dlpdu);
-            const senderDomain = getDomainFromId(dlpdu.sender);
-            if (!(await keyStore.validateDomainSignature(redacted, senderDomain))) {
-                throw new Error(`${event.type}: Validation Failed: Signature error on owner_server + sender`);
-            }
-        }
-        if (typeof event.owner_server !== "string" && typeof event.delegated_server !== "string") {
-            // Verify sender signature on PDU
-            const senderDomain = getDomainFromId(event.sender);
-            const redacted = this.redact(event);
-            if (!(await keyStore.validateDomainSignature(redacted, senderDomain))) {
-                throw new Error(`${event.type}: Validation Failed: Signature error on sender`);
+        } else {
+            // Verify sender signed PDU
+            let redacted = this.redact(event);
+            if (!(await keyStore.validateDomainSignature(redacted, origin))) {
+                throw new Error(`${event.type}: Validation Failed: Signature error on origin (normal PDU)`);
             }
         }
 
@@ -252,20 +242,32 @@ export class IDMimiLinearized00 implements RoomVersion {
         // If we managed to make it here, we passed validation 🎉
     }
 
-    public checkAuth(event: MatrixEvent, allEvents: MatrixEvent[]): void {
+    public checkAuth(event: PDU, allEvents: MatrixEvent[]): void {
         // First we need to establish "current state"
         const currentState = new CurrentRoomState(allEvents);
 
-        // Now we run the auth rules. These are v10's rules with some modifications
-        // and without DAG bits.
+        // Now we run the auth rules. These are v10's rules with some modifications.
         // https://spec.matrix.org/v1.6/rooms/v10/#authorization-rules
 
         if (event.type === "m.room.create") {
             if (allEvents.length) {
+                // this isn't technically an auth rule, but a logic gate on our part
                 throw new Error(`${event.type}: can't send a second create event`);
+            }
+            if (event.prev_events.length > 0) {
+                throw new Error(`${event.type}: create event cannot have prev_events`);
+            }
+            if (getDomainFromId(event.sender) !== getDomainFromId(event.room_id)) {
+                throw new Error(`${event.type}: create event sender must match room ID namespace`);
             }
             return; // allow
         }
+
+        // Validate the auth events
+        // TODO: Auth rule 2 - https://github.com/matrix-org/linearized-matrix/issues/23
+
+        // TODO: Validate the event was sent by the hub server if a hub_server is set
+        // https://github.com/matrix-org/linearized-matrix/issues/25
 
         const createEvent = currentState.get("m.room.create", "");
         if (!createEvent) throw new Error(`${event.type}: invalid state - no room create event`);
@@ -419,6 +421,8 @@ export class IDMimiLinearized00 implements RoomVersion {
                 throw new Error(`${event.type}: cannot invite other users`);
             }
         }
+
+        // TODO: Check m.room.hub rules - https://github.com/matrix-org/linearized-matrix/issues/26
 
         if (!powerLevels.canUserSend(event.sender, event.type, event.state_key !== undefined)) {
             throw new Error(`${event.type}: power levels do not permit sending this event`);
@@ -614,7 +618,7 @@ export class IDMimiLinearized00 implements RoomVersion {
         return; // "otherwise, allow" catch-all
     }
 
-    public redact(event: MatrixEvent | Omit<MatrixEvent, "signatures">): object {
+    public redact(event: AnyPDU | Omit<AnyPDU, "signatures">): object {
         return redactObject(event, PduKeepFields);
     }
 }

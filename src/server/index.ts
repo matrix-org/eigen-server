@@ -6,6 +6,7 @@ import {Runtime} from "./Runtime";
 import {SelfSigningKey} from "./SelfSigningKey";
 import {FederationServer} from "./FederationServer";
 import bodyParser from "body-parser";
+import {InviteStore} from "./InviteStore";
 
 const port: number = Number(process.env["LM_PORT"] ?? 3000);
 const serverName = `localhost:${port}`;
@@ -20,9 +21,10 @@ Runtime.signingKey = new SelfSigningKey(serverName);
 // Start registering routes and stuff
 const keyStore = new KeyStore();
 const roomStore = new RoomStore(keyStore);
-const csApi = new ClientServerApi(serverName, roomStore, keyStore);
+const inviteStore = new InviteStore(keyStore, roomStore);
+const csApi = new ClientServerApi(serverName, roomStore, inviteStore);
 csApi.registerRoutes(app);
 keyStore.registerRoutes(app);
-new FederationServer(roomStore, keyStore, csApi).registerRoutes(app);
+new FederationServer(roomStore, keyStore, inviteStore).registerRoutes(app);
 
 app.listen(port, () => console.log(`Listening on ${port}`));

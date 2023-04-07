@@ -12,3 +12,7 @@ export function getRoomVersionImpl(version: string): RoomVersion;
 export function getRoomVersionImpl(version: string): RoomVersion | undefined {
     return roomVersionImpls.get(version);
 }
+
+export function getSupportedVersions(): string[] {
+    return Array.from(roomVersionImpls.keys());
+}

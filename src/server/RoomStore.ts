@@ -1,22 +1,37 @@
-import {Room} from "./models/Room";
+import {HubRoom} from "./models/room/HubRoom";
 import {KeyStore} from "./KeyStore";
+import EventEmitter from "events";
+import {ParticipantRoom} from "./models/room/ParticipantRoom";
 
 export class RoomStore {
-    private rooms: Room[] = []; // TODO: Persist
+    private rooms: ParticipantRoom[] = []; // TODO: Persist
+
+    private emitter = new EventEmitter();
 
     public constructor(private keyStore: KeyStore) {}
 
-    public async createRoom(creator: string): Promise<Room> {
-        const room = await Room.create(creator, this.keyStore);
-        this.rooms.push(room);
+    public async createRoom(creator: string): Promise<HubRoom> {
+        const room = await HubRoom.create(creator, this.keyStore);
+        this.addRoom(room);
         return room;
     }
 
-    public getRoom(roomId: string): Room | undefined {
+    public getRoom(roomId: string): ParticipantRoom | undefined {
         return this.rooms.find(r => r.roomId === roomId);
     }
 
-    public addRoom(room: Room) {
+    public addRoom(room: ParticipantRoom) {
         this.rooms.push(room);
+        this.emitter.emit("room", room);
+    }
+
+    public on(event: "room", fn: (room: HubRoom) => void): void;
+    public on(event: string, fn: (...args: any[]) => void): void {
+        this.emitter.on(event, fn);
+    }
+
+    public off(event: "room", fn: (room: HubRoom) => void): void;
+    public off(event: string, fn: (...args: any[]) => void): void {
+        this.emitter.off(event, fn);
     }
 }

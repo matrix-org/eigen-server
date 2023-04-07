@@ -1,12 +1,12 @@
 // XXX: Arguably this definition should be part of the room version for format reasons
 export interface MatrixEvent {
+    event_id: string;
     room_id: string;
     type: string;
     state_key?: string | undefined;
     sender: string;
     origin_server_ts: number;
-    owner_server?: string;
-    delegated_server?: string;
+    hub_server?: string;
     content: Record<string, any>;
     hashes: {
         sha256: string;
@@ -16,6 +16,8 @@ export interface MatrixEvent {
             [keyId: string]: string;
         };
     };
+    auth_events: string[];
+    prev_events: string[];
 }
 
 export interface StateEvent extends MatrixEvent {
@@ -23,13 +25,16 @@ export interface StateEvent extends MatrixEvent {
 }
 
 export interface ClientFriendlyMatrixEvent
-    extends Omit<MatrixEvent, "delegated_server" | "owner_server" | "hashes" | "signatures"> {
-    // event_id: string; // normally we'd have this here, but we don't use it on our CS API example
+    extends Omit<MatrixEvent, "hub_server" | "hashes" | "signatures" | "auth_events" | "prev_events"> {
+    // no additional fields
 }
 
-export interface OnlyV4PDUFields {
-    auth_events: string[];
-    depth: number;
-    prev_events: string[];
+export interface LinearizedPDU extends Omit<MatrixEvent, "event_id" | "auth_events" | "prev_events" | "hashes"> {
+    // no additional fields
 }
-export interface V4PDU extends MatrixEvent, OnlyV4PDUFields {}
+
+export interface PDU extends Omit<MatrixEvent, "event_id"> {
+    // no additional fields
+}
+
+export type AnyPDU = LinearizedPDU | PDU;

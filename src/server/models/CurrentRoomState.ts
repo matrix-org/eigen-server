@@ -14,6 +14,10 @@ export class CurrentRoomState {
         }
     }
 
+    public get events(): StateEvent[] {
+        return Array.from(this.state.values()).reduce((p, c) => [...p, ...Array.from(c.values())], [] as StateEvent[]);
+    }
+
     public get(eventType: string, stateKey: string): StateEvent | undefined {
         return this.state.get(eventType)?.get(stateKey);
     }
