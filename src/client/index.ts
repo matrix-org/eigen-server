@@ -75,7 +75,7 @@ process.stdin.on("data", (key: string) => {
                     roomId: currentRoomId,
                     eventType: "m.room.message",
                     stateKey: undefined,
-                    content: {body: buffer},
+                    content: {body: buffer, msgtype: "m.text"},
                 } as SendPacket);
             }
         }
