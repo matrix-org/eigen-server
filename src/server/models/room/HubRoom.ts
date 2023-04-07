@@ -195,7 +195,7 @@ export class HubRoom extends ParticipantRoom {
 
         // TODO: This is horribly inefficient
         const authChain = this.events.filter(e => event.auth_events.includes(e.event_id));
-        const stateEvents = this.currentState.events;
+        // const stateEvents = this.currentState.events;
 
         const toPdu = (e: MatrixEvent): PDU => {
             const clone = JSON.parse(JSON.stringify(e));
@@ -203,10 +203,17 @@ export class HubRoom extends ParticipantRoom {
             return clone;
         };
 
+        const pdu: PDU & Partial<Omit<MatrixEvent, keyof PDU>> = JSON.parse(JSON.stringify(event));
+        delete pdu.event_id;
+
         return {
             chain: authChain.map(e => toPdu(e)),
-            state: stateEvents.map(e => toPdu(e)),
-            event: event,
+            // TODO: This is not how we're supposed to handle `state`
+            // TODO: https://github.com/matrix-org/linearized-matrix/issues/27
+            // state: stateEvents.map(e => toPdu(e)),
+            state: this.events.filter(e => e.event_id !== event.event_id).map(e => toPdu(e)),
+
+            event: pdu,
         };
     }
 
