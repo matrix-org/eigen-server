@@ -159,6 +159,7 @@ export class ClientServerApi {
             try {
                 await room.doInvite(client.userId, packet.targetUserId);
             } catch (e) {
+                console.error(e);
                 this.sendToClient(client, {
                     type: PacketType.Error,
                     message: (e as Error)?.message ?? "Unknown error",
