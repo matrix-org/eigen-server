@@ -133,6 +133,7 @@ export class FederationClient {
         }
 
         // create the LPDU
+        event.hub_server = this.forDomain; // XXX: We're assuming they're a hub
         const lpdu = JSON.parse(JSON.stringify(event));
         delete lpdu["auth_events"];
         delete lpdu["prev_events"];
