@@ -18,6 +18,7 @@ export class FederationServer {
         app.get("/_matrix/federation/v1/make_join/:roomId/:userId", this.onMakeJoinRequest.bind(this));
         app.put("/_matrix/federation/v2/send_join/:roomId/:eventId", this.onSendJoinRequest.bind(this));
         app.get("/_matrix/federation/v1/event_auth/:roomId/:eventId", this.onEventAuthRequest.bind(this));
+        app.get("/_matrix/federation/v1/query/profile", this.onQueryProfile.bind(this));
     }
 
     private async onInviteRequest(req: express.Request, res: express.Response) {
@@ -241,5 +242,21 @@ export class FederationServer {
                 // @ts-ignore
                 .map(toPdu),
         });
+    }
+
+    private async onQueryProfile(req: express.Request, res: express.Response) {
+        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Check that server can receive this event.
+
+        console.error(`Received event_auth request for ${req.params["roomId"]} for ${req.params["eventId"]}`);
+
+        if (typeof req.body !== "object") {
+            return res.status(400).json({errcode: "M_BAD_JSON"}); // we assume it was JSON, at least
+        }
+
+        // TODO Actually calculate if the user exists / support user profiles.
+        // @ts-ignore
+        const userId = req.params["user_id"];
+        res.status(200).json({});
     }
 }
