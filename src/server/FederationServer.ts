@@ -19,6 +19,7 @@ export class FederationServer {
         app.put("/_matrix/federation/v2/send_join/:roomId/:eventId", this.onSendJoinRequest.bind(this));
         app.get("/_matrix/federation/v1/event_auth/:roomId/:eventId", this.onEventAuthRequest.bind(this));
         app.get("/_matrix/federation/v1/query/profile", this.onQueryProfile.bind(this));
+        app.get("/_matrix/federation/v1/event/:eventId", this.onEventRequest.bind(this));
     }
 
     private async onInviteRequest(req: express.Request, res: express.Response) {
@@ -114,7 +115,7 @@ export class FederationServer {
                         await room.sendEvent(event);
                     }
                 } else {
-                    room.receiveEvent(event);
+                    await room.receiveEvent(event);
                 }
             } catch (e) {
                 console.error(e);
@@ -213,7 +214,7 @@ export class FederationServer {
         // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
         // TODO: Check that server can receive this event.
 
-        console.error(`Received event_auth request for ${req.params["roomId"]} for ${req.params["eventId"]}`);
+        console.log(`Received event_auth request for ${req.params["roomId"]} for ${req.params["eventId"]}`);
 
         if (typeof req.body !== "object") {
             return res.status(400).json({errcode: "M_BAD_JSON"}); // we assume it was JSON, at least
@@ -246,17 +247,31 @@ export class FederationServer {
 
     private async onQueryProfile(req: express.Request, res: express.Response) {
         // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
-        // TODO: Check that server can receive this event.
-
-        console.error(`Received event_auth request for ${req.params["roomId"]} for ${req.params["eventId"]}`);
-
-        if (typeof req.body !== "object") {
-            return res.status(400).json({errcode: "M_BAD_JSON"}); // we assume it was JSON, at least
-        }
 
         // TODO Actually calculate if the user exists / support user profiles.
         // @ts-ignore
         const userId = req.params["user_id"];
         res.status(200).json({});
+    }
+
+    private async onEventRequest(req: express.Request, res: express.Response) {
+        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Check that server can receive this event.
+
+        // We don't know what room this event is in, so let's just query them all
+        // TODO: Track event IDs as globally unique
+        for (const room of this.roomStore.allRooms) {
+            const event = room.getEvent(req.params["eventId"]);
+            if (!!event) {
+                // XXX: Why is this a transaction!?
+                return res.status(200).json({
+                    origin: Runtime.signingKey.serverName,
+                    origin_server_ts: new Date().getTime(),
+                    pdus: [event],
+                });
+            }
+        }
+
+        return res.status(404).json({errcode: "M_NOT_FOUND", error: "Exhausted all attempts to find event"});
     }
 }

@@ -11,7 +11,7 @@ import {CurrentRoomState} from "../CurrentRoomState";
 
 export class HubRoom extends ParticipantRoom {
     public get orderedEvents(): MatrixEvent[] {
-        return [...this.events];
+        return this.timeline.currentEvents; // clones array internally
     }
 
     public async sendEvent(event: LinearizedPDU): Promise<void> {
@@ -75,7 +75,7 @@ export class HubRoom extends ParticipantRoom {
             }
 
             // TODO: This is horrible for performance
-            const prevIds: string[] = [[...this.events].reverse()[0]!.event_id];
+            const prevIds: string[] = [this.timeline.lastEvent!.event_id];
 
             pdu.auth_events = Array.from(new Set(authIds));
             pdu.prev_events = prevIds;
@@ -135,7 +135,6 @@ export class HubRoom extends ParticipantRoom {
         }
 
         await this.inject(event);
-        this.emitter.emit("event", event);
 
         // fanout
         const joinedServers = new Set(this.joinedUserIds.map(m => getDomainFromId(m)));
@@ -156,8 +155,7 @@ export class HubRoom extends ParticipantRoom {
         const pdu: PDU & Partial<Omit<MatrixEvent, keyof PDU>> = {...event};
         delete pdu["event_id"];
         await this.roomVersion.checkValidity(pdu, this.keyStore);
-        this.roomVersion.checkAuth(event, this.events);
-        this.events.push(event);
+        await this.timeline.insertEvents([event]); // checks auth internally
     }
 
     public createJoinTemplate(userId: string): LinearizedPDU | undefined {
@@ -172,7 +170,7 @@ export class HubRoom extends ParticipantRoom {
             }),
         );
         try {
-            this.roomVersion.checkAuth(ev, this.events);
+            this.roomVersion.checkAuth(ev, this.timeline.currentEvents);
         } catch (e) {
             console.error(e);
             return undefined;
@@ -222,7 +220,7 @@ export class HubRoom extends ParticipantRoom {
         await this.reallySendEvent(event);
 
         // TODO: This is horribly inefficient
-        const authChain = this.events.filter(e => event.auth_events.includes(e.event_id));
+        const authChain = this.timeline.currentEvents.filter(e => event.auth_events.includes(e.event_id));
         // const stateEvents = this.currentState.events;
 
         const toPdu = (e: MatrixEvent): PDU => {
@@ -239,7 +237,7 @@ export class HubRoom extends ParticipantRoom {
             // TODO: This is not how we're supposed to handle `state`
             // TODO: https://github.com/matrix-org/linearized-matrix/issues/27
             // state: stateEvents.map(e => toPdu(e)),
-            state: this.events.filter(e => e.event_id !== event.event_id).map(e => toPdu(e)),
+            state: this.timeline.currentEvents.filter(e => e.event_id !== event.event_id).map(e => toPdu(e)),
 
             event: pdu,
         };

@@ -18,6 +18,7 @@ export interface MatrixEvent {
     };
     auth_events: string[];
     prev_events: string[];
+    unsigned?: Record<string, any>;
 }
 
 export interface StateEvent extends MatrixEvent {

@@ -41,7 +41,7 @@ export class InviteStore {
         if (room instanceof HubRoom) {
             await room.receivePdu(joinEvent);
         } else {
-            room.receiveEvent(joinEvent);
+            await room.receiveEvent(joinEvent);
         }
 
         this.pending = this.pending.filter(i => i !== invite);

@@ -1,6 +1,5 @@
 import {Room} from "./Room";
 import {ClientFriendlyMatrixEvent, LinearizedPDU, MatrixEvent, PDU} from "../event";
-import EventEmitter from "events";
 import {RoomVersion} from "../../room_versions/RoomVersion";
 import {KeyStore} from "../../KeyStore";
 import {calculateReferenceHash} from "../../util/hashing";
@@ -9,12 +8,14 @@ import {CurrentRoomState} from "../CurrentRoomState";
 import {getDomainFromId} from "../../util/id";
 import {FederationClient} from "../../FederationClient";
 import {getRoomVersionImpl} from "../../room_versions/map";
+import {LinearizedDAG} from "../LinearizedDAG";
 
 export class ParticipantRoom implements Room {
-    protected emitter = new EventEmitter();
-    protected events: MatrixEvent[] = [];
+    protected timeline: LinearizedDAG;
 
-    protected constructor(public roomId: string, protected roomVersion: RoomVersion, protected keyStore: KeyStore) {}
+    protected constructor(public roomId: string, protected roomVersion: RoomVersion, protected keyStore: KeyStore) {
+        this.timeline = new LinearizedDAG(this.roomVersion);
+    }
 
     public get hubDomain(): string {
         const state = this.currentState;
@@ -32,7 +33,7 @@ export class ParticipantRoom implements Room {
     }
 
     protected get currentState(): CurrentRoomState {
-        return new CurrentRoomState(this.events);
+        return new CurrentRoomState(this.timeline.currentEvents);
     }
 
     public get version(): string {
@@ -99,7 +100,7 @@ export class ParticipantRoom implements Room {
         return new FederationClient(this.hubDomain).sendLinearizedPdus([event]);
     }
 
-    public receiveEvent(event: LinearizedPDU): void {
+    public async receiveEvent(event: LinearizedPDU): Promise<void> {
         if (this.hubDomain === Runtime.signingKey.serverName) {
             throw new Error("Runtime error: Override issue - not receiving events in a HubRoom");
         }
@@ -109,27 +110,26 @@ export class ParticipantRoom implements Room {
             ...(event as PDU),
             event_id: `$${calculateReferenceHash(this.roomVersion.redact(event))}`,
         };
-        this.events.push(fullEvent); // TODO: Splice properly - https://github.com/matrix-org/linearized-matrix/issues/24
-        this.emitter.emit("event", fullEvent);
+        await this.timeline.insertEvents([fullEvent]);
     }
 
-    public getEvent(eventId: string): MatrixEvent | null {
-        for (const event of this.events) {
+    public getEvent(eventId: string): MatrixEvent | undefined {
+        for (const event of this.timeline.currentEvents) {
             if (event.event_id == eventId) {
                 return event;
             }
         }
-        return null;
+        return undefined;
     }
 
     public on(event: "event", fn: (event: MatrixEvent) => void): void;
     public on(event: string, fn: (...args: any[]) => void): void {
-        this.emitter.on(event, fn);
+        this.timeline.on(event as any, fn);
     }
 
     public off(event: "event", fn: (event: MatrixEvent) => void): void;
     public off(event: string, fn: (...args: any[]) => void): void {
-        this.emitter.off(event, fn);
+        this.timeline.off(event as any, fn);
     }
 
     public static async createRoomFromCreateEvent(
@@ -149,7 +149,7 @@ export class ParticipantRoom implements Room {
 
     public static createFromOtherRoom(room: ParticipantRoom): ParticipantRoom {
         const newRoom = new ParticipantRoom(room.roomId, room.roomVersion, room.keyStore);
-        newRoom.events = room.events;
+        newRoom.timeline = room.timeline;
         return newRoom;
     }
 }

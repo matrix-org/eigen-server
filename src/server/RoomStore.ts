@@ -10,6 +10,10 @@ export class RoomStore {
 
     public constructor(private keyStore: KeyStore) {}
 
+    public get allRooms(): ParticipantRoom[] {
+        return this.rooms;
+    }
+
     public async createRoom(creator: string): Promise<HubRoom> {
         const room = await HubRoom.create(creator, this.keyStore);
         this.addRoom(room);

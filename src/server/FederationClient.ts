@@ -4,6 +4,7 @@ import {getRoomVersionImpl, getSupportedVersions} from "./room_versions/map";
 import {calculateReferenceHash} from "./util/hashing";
 import {createHash} from "crypto";
 import {Runtime} from "./Runtime";
+import {RoomVersion} from "./room_versions/RoomVersion";
 
 export class FederationClient {
     private url?: FederationUrl;
@@ -165,5 +166,30 @@ export class FederationClient {
         // TODO: We assume stateBefore is ordered
         // https://github.com/matrix-org/linearized-matrix/issues/27
         return [stateBefore, finalEvent];
+    }
+
+    public async getEvent(eventId: string, roomVersion: RoomVersion): Promise<MatrixEvent> {
+        const requestPath = `/_matrix/federation/v1/event/${encodeURIComponent(eventId)}`;
+        const res = await fetch(`${(await this.getUrl()).httpsUrl}${requestPath}`, {
+            method: "GET",
+            headers: {
+                // TODO Support multiple keys.
+                Authorization: this.getAuthHeader("GET", requestPath),
+            },
+        });
+        const json = await res.json();
+        if (!!json["errcode"]) {
+            // TODO: Raise a better error
+            throw new Error(JSON.stringify(json));
+        }
+
+        const pdu: PDU = json["pdus"][0]; // it's a transaction response for some reason
+        const redacted = roomVersion.redact(pdu);
+        const actualEventId = `$${calculateReferenceHash(redacted)}`;
+        if (actualEventId !== eventId) {
+            throw new Error(`Server returned ${actualEventId} when we were expecting ${eventId}`);
+        }
+
+        return {...pdu, event_id: actualEventId};
     }
 }
