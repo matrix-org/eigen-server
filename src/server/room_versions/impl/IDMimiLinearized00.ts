@@ -205,6 +205,7 @@ export class IDMimiLinearized00 implements RoomVersion {
             );
         }
 
+        const origin = getDomainFromId(event.sender);
         if (typeof event.hub_server === "string") {
             // Verify the hub's signature
             let redacted = this.redact(event);
@@ -212,7 +213,6 @@ export class IDMimiLinearized00 implements RoomVersion {
                 throw new Error(`${event.type}: Validation Failed: Signature error on hub_server`);
             }
 
-            const origin = getDomainFromId(event.sender);
             if (origin !== event.hub_server) {
                 const linearizedPdu: LinearizedPDU & Partial<Exclude<PDU, keyof LinearizedPDU>> = JSON.parse(
                     JSON.stringify(event),
@@ -229,7 +229,6 @@ export class IDMimiLinearized00 implements RoomVersion {
             }
         } else {
             // Verify sender signed PDU
-            const origin = getDomainFromId(event.sender);
             let redacted = this.redact(event);
             if (!(await keyStore.validateDomainSignature(redacted, origin))) {
                 throw new Error(`${event.type}: Validation Failed: Signature error on origin (normal PDU)`);
