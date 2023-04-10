@@ -160,7 +160,7 @@ export class HubRoom extends ParticipantRoom {
         this.events.push(event);
     }
 
-    public createJoinTemplate(userId: string): PDU | undefined {
+    public createJoinTemplate(userId: string): LinearizedPDU | undefined {
         const ev = this.formalizeEvent(
             this.createEvent({
                 type: "m.room.member",
@@ -178,20 +178,22 @@ export class HubRoom extends ParticipantRoom {
             return undefined;
         }
 
-        const pdu: PDU & Partial<Omit<MatrixEvent, keyof PDU>> = ev;
+        const lpdu: PDU & Partial<Omit<MatrixEvent, keyof LinearizedPDU>> = ev;
+
         // Remove the event ID, hashes, signatures, and unsigned.
-        delete pdu["event_id"];
+        // TODO: @@TR: FIX TS
+        delete lpdu["event_id"];
         // @ts-ignore
-        delete pdu["unsigned"];
+        delete lpdu["unsigned"];
         // @ts-ignore
-        delete pdu["signatures"];
+        delete lpdu["signatures"];
         // @ts-ignore
-        delete pdu["hashes"];
+        delete lpdu["hashes"];
 
         // We don't know if the server asking to join uses a hub or not.
-        delete pdu["hub_server"];
+        delete lpdu["hub_server"];
 
-        return pdu;
+        return lpdu;
     }
 
     public async doSendJoin(join: PDU, expectedEventId: string): Promise<{chain: PDU[]; event: PDU; state: PDU[]}> {

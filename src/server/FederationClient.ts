@@ -31,14 +31,13 @@ export class FederationClient {
     }
 
     private getAuthHeader(method: string, uri: string, content: any | undefined = undefined): string {
-        const json = {
-            method: "PUT",
+        const json: any = {
+            method: method,
             uri: uri,
             origin: Runtime.signingKey.serverName,
             destination: this.forDomain,
         };
         if (content !== undefined) {
-            // @ts-ignore
             json.content = content;
         }
         const signed = Runtime.signingKey.signJson(json);

@@ -50,6 +50,5 @@ export function calculateReferenceHash(redactedEvent: object): string {
     // Step 4: hash it
     const hash = createHash("sha256").update(canonical).digest();
 
-    // Turn into a web-safe base 64.
-    return unpaddedBase64Encode(hash).replace(/\+/g, "-").replace(/\//g, "_");
+    return unpaddedBase64Encode(hash, true);
 }
