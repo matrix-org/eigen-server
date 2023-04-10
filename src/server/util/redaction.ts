@@ -1,7 +1,7 @@
 export type RedactConfig = {
     keepTopLevel: string[];
-    keepUnder: {
-        [type: string]: Record<string, string[]>;
+    contentFields: {
+        [type: string]: string[];
     };
 };
 export function redactObject(obj: any, config: RedactConfig): any {
@@ -9,14 +9,13 @@ export function redactObject(obj: any, config: RedactConfig): any {
     for (const field of config.keepTopLevel) {
         newObj[field] = obj[field];
     }
-    const keep = config.keepUnder[obj["type"]];
-    if (!!keep) {
-        for (const [field, fields] of Object.entries(keep)) {
-            if (typeof obj[field] !== "object") {
-                throw new Error(`Expected to redact an object at ${field}, but received a non-object`);
-            }
-            newObj[field] = redactObject(obj[field], {keepTopLevel: fields, keepUnder: {}});
-        }
+
+    const keepContent = config.contentFields[obj["type"]] || [];
+    const newContent: any = {};
+    newObj.content = newContent;
+    for (const field of keepContent) {
+        newContent[field] = obj.content[field];
     }
+
     return newObj;
 }

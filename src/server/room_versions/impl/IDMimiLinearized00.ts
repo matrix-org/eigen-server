@@ -25,22 +25,21 @@ const PduKeepFields: RedactConfig = {
         "origin_server_ts",
         "hub_server",
     ],
-    keepUnder: {
-        "m.room.member": {
-            content: ["membership", "join_authorised_via_users_server"],
-        },
-        "m.room.create": {
-            content: ["room_version"], // TODO: Other fields too
-        },
-        "m.room.join_rules": {
-            content: ["join_rule", "allow"],
-        },
-        "m.room.power_levels": {
-            content: ["ban", "events", "events_default", "kick", "redact", "state_default", "users", "users_default"],
-        },
-        "m.room.history_visibility": {
-            content: ["history_visibility"],
-        },
+    contentFields: {
+        "m.room.member": ["membership", "join_authorised_via_users_server"],
+        "m.room.create": ["room_version"], // TODO: Other fields too
+        "m.room.join_rules": ["join_rule", "allow"],
+        "m.room.power_levels": [
+            "ban",
+            "events",
+            "events_default",
+            "kick",
+            "redact",
+            "state_default",
+            "users",
+            "users_default",
+        ],
+        "m.room.history_visibility": ["history_visibility"],
     },
 };
 
