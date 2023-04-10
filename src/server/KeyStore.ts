@@ -106,6 +106,7 @@ export class KeyStore {
                 old_verify_keys: {},
                 server_name: Runtime.signingKey.serverName,
                 valid_until_ts: new Date().getTime() + 2 * 60 * 60 * 1000,
+                "m.linearized": true,
                 verify_keys: {
                     [`ed25519:${Runtime.signingKey.keyId}`]: {
                         key: unpaddedBase64Encode(Buffer.from(Runtime.signingKey.publicKey)),
