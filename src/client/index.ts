@@ -149,9 +149,13 @@ function onInvite(invite: RoomInvitedPacket) {
 function onEvent(packet: EventPacket) {
     const event = packet.event;
     const displayName = event.sender === myUserId ? "You" : event.sender;
-    ui.log.write(
-        `${displayName} | ${event.event_id} ${event.type} (state_key: ${JSON.stringify(
-            event.state_key,
-        )}) ${JSON.stringify(event.content)}`,
-    );
+    if (packet.rawFormat) {
+        ui.log.write(JSON.stringify(event));
+    } else {
+        ui.log.write(
+            `${displayName} | ${event.event_id} ${event.type} (state_key: ${JSON.stringify(
+                event.state_key,
+            )}) ${JSON.stringify(event.content)}`,
+        );
+    }
 }

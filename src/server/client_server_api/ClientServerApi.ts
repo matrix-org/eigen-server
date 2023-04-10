@@ -124,7 +124,7 @@ export class ClientServerApi {
                 return; // skip remaining processing
             }
         }
-        this.sendToClient(client, {type: PacketType.Event, event: event} as EventPacket);
+        this.sendToClient(client, {type: PacketType.Event, event: event, rawFormat: raw} as EventPacket);
     }
 
     private async userCreateRoom(client: ChatClient) {

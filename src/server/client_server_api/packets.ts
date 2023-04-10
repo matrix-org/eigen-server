@@ -62,6 +62,7 @@ export interface SendPacket extends Packet {
 export interface EventPacket extends Packet {
     type: PacketType.Event;
     event: ClientFriendlyMatrixEvent;
+    rawFormat: boolean;
 }
 
 export interface DumpRoomInfoPacket extends Packet {
