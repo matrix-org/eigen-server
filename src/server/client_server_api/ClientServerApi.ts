@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import {Express} from "express";
+import express, {Express} from "express";
 import crypto from "crypto";
 import {
     DumpRoomInfoPacket,
@@ -88,6 +88,7 @@ export class ClientServerApi {
                 }
             });
         });
+        app.get("/dump/:roomId", this.userWantsRoomDumpHttp.bind(this));
     }
 
     private sendToClient(client: ChatClient, packet: Packet) {
@@ -221,6 +222,22 @@ export class ClientServerApi {
                     message: "Room is not a HubRoom and cannot be introspected",
                     originalPacket: packet,
                 } as ErrorPacket);
+            }
+        }
+    }
+
+    private async userWantsRoomDumpHttp(req: express.Request, res: express.Response) {
+        // TODO: Some sort of authentication on this endpoint
+        const room = this.roomStore.getRoom(req.params["roomId"]);
+        if (!room) {
+            return res.status(404).json({errcode: "M_NOT_FOUND"});
+        } else {
+            if (room instanceof HubRoom) {
+                return res.status(200).json(room.orderedEvents);
+            } else {
+                return res
+                    .status(500)
+                    .json({errcode: "M_UNKNOWN", error: "Room is not a HubRoom and cannot be introspected"});
             }
         }
     }
