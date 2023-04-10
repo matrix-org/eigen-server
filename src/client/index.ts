@@ -16,7 +16,7 @@ import {
 const ui = new inquirer.ui.BottomBar();
 
 ui.log.write("--------------------------------------------------");
-ui.log.write("==     LINEARIZED MATRIX DEVELOPMENT CLIENT     ==");
+ui.log.write("==        EIGEN-SERVER DEVELOPMENT CLIENT       ==");
 ui.log.write("--------------------------------------------------");
 ui.log.write("Not for production use. Limited to a single room.");
 ui.log.write("Press Ctrl+C to exit or type '\\q'");
@@ -91,7 +91,7 @@ process.stdin.on("data", (key: string) => {
     render();
 });
 
-const ws = new WebSocket(`ws://${process.env["LM_HOSTNAME"] || "localhost"}:${process.env["LM_PORT"] ?? 3000}/client`);
+const ws = new WebSocket(`ws://${process.env["ES_HOSTNAME"] || "localhost"}:${process.env["ES_PORT"] ?? 3000}/client`);
 ws.on("open", () => {
     ui.log.write("* | Connected");
 });

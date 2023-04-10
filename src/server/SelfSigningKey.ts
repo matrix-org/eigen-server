@@ -6,10 +6,10 @@ import {canonicalSerialize} from "./util/canonical_json";
 export class SelfSigningKey {
     private privateKey: forge.pki.ed25519.NativeBuffer;
     private internalPublicKey: forge.pki.ed25519.NativeBuffer;
-    public readonly keyId = process.env["LM_SIGNING_KEY_ID"] || "1";
+    public readonly keyId = process.env["ES_SIGNING_KEY_ID"] || "1";
 
     public constructor(public readonly serverName: string) {
-        const signingKeyPath = process.env["LM_SIGNING_KEY_PATH"] || "./signing.key";
+        const signingKeyPath = process.env["ES_SIGNING_KEY_PATH"] || "./signing.key";
         if (fs.existsSync(signingKeyPath)) {
             this.privateKey = fs.readFileSync(signingKeyPath);
             this.internalPublicKey = forge.pki.ed25519.publicKeyFromPrivateKey({privateKey: this.privateKey});

@@ -1,4 +1,4 @@
-# The client-server API is not in scope for Linearized Matrix
+# The client-server API is not in scope for Linearized Matrix or Eigen Server
 
 This CS API exists to show what an "existing messenger" *could* look like and is not representative of
 a real client. It uses websockets for ease of use.

@@ -8,8 +8,8 @@ import {FederationServer} from "./FederationServer";
 import bodyParser from "body-parser";
 import {InviteStore} from "./InviteStore";
 
-const port: number = Number(process.env["LM_PORT"] ?? 3000);
-const serverName = `${process.env["LM_HOSTNAME"] || "localhost"}:${port}`;
+const port: number = Number(process.env["ES_PORT"] ?? 3000);
+const serverName = `${process.env["ES_HOSTNAME"] || "localhost"}:${port}`;
 const app = express();
 app.use(bodyParser.json());
 

@@ -1,17 +1,21 @@
-# linearized-matrix
-Example server and development test client for Linearized Matrix
+# eigen-server
 
-I-D: https://datatracker.ietf.org/doc/draft-ralston-mimi-linearized-matrix/
+Example server for a Linearized Matrix hub & participant. Note that the included client is awful and only for
+demonstrative purposes: a proper implementation of Linearized Matrix would be bringing an existing, more useful,
+client.
 
-MSC: TBD
+Specifications:
+* [MSC3995: Linearized Matrix](https://github.com/matrix-org/matrix-spec-proposals/pull/3995) - Covers *everything* in
+  the Linearized Matrix stack, including DAG interoperability.
+* [I-D.ralston-mimi-linearized-matrix](https://datatracker.ietf.org/doc/draft-ralston-mimi-linearized-matrix/) - Covers
+  just the bits which pertain to non-DAG consumers. Note that the I-D lags behind the MSC in terms of accuracy and latest
+  thinking at the moment.
 
-**TODO**: Better description.
-
-**Not intended for production usage, currently.**
+**Do not use this in production.** It's just not meant to scale, and likely never will.
 
 ## Development
 
-Requires NodeJS 18.x and yarn
+Requires NodeJS 18.x and yarn.
 
 1. Clone repo
 2. `yarn install`
@@ -22,10 +26,10 @@ To start the demo server: `yarn dev:server`
 
 ### Setting up a demo
 
-1. `LM_PORT=3000 LM_SIGNING_KEY_PATH=./p3000.signing.key yarn dev:server` to start the server. This will block until killed.
-2. `LM_PORT=3001 LM_SIGNING_KEY_PATH=./p3001.signing.key yarn dev:server` to start the second server in a new terminal window.
-3. In a new terminal window, `LM_PORT=3000 yarn dev:client:nobuild`. This will also block until killed.
-4. In a fourth terminal window, `LM_PORT=3001 yarn dev:client:nobuild` to start the second client.
+1. `ES_PORT=3000 ES_SIGNING_KEY_PATH=./p3000.signing.key yarn dev:server` to start the server. This will block until killed.
+2. `ES_PORT=3001 ES_SIGNING_KEY_PATH=./p3001.signing.key yarn dev:server` to start the second server in a new terminal window.
+3. In a new terminal window, `ES_PORT=3000 yarn dev:client:nobuild`. This will also block until killed.
+4. In a fourth terminal window, `ES_PORT=3001 yarn dev:client:nobuild` to start the second client.
 5. Grab the auto-assigned user ID from the fourth terminal and put it on your clipboard.
 6. In the third terminal window (first client), type `/createRoom` and press <kbd>Enter</kbd>.
 7. You should now have a room that you're chatting in.
@@ -36,3 +40,11 @@ To start the demo server: `yarn dev:server`
 Some additional notes:
 * The terminal client doesn't support backspace. Just "send" the typo and it'll be fine.
 * All rooms and users are held in memory for now.
+
+### Synapse demo
+
+You will need a Synapse running the [`clokep/lm` branch](https://github.com/matrix-org/synapse/compare/develop...clokep/lm).
+
+1. Create the room on the eigen-server hub.
+2. Invite your Synapse user.
+3. Success! (probably)
