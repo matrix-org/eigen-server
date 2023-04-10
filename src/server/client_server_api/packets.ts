@@ -10,6 +10,7 @@ export enum PacketType {
     Error, // Either direction
     Send, // Client -> Server
     Event, // Server -> Client
+    DumpRoomInfo, // Client -> Server
 }
 
 export interface Packet {
@@ -61,4 +62,9 @@ export interface SendPacket extends Packet {
 export interface EventPacket extends Packet {
     type: PacketType.Event;
     event: ClientFriendlyMatrixEvent;
+}
+
+export interface DumpRoomInfoPacket extends Packet {
+    type: PacketType.DumpRoomInfo;
+    roomId: string;
 }

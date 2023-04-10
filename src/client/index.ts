@@ -1,6 +1,7 @@
 import inquirer from "inquirer";
 import WebSocket from "ws";
 import {
+    DumpRoomInfoPacket,
     EventPacket,
     InvitePacket,
     JoinPacket,
@@ -44,6 +45,9 @@ process.stdin.on("data", (key: string) => {
         } else if (buffer.trim() === "/createRoom") {
             command = true;
             sendPacket({type: PacketType.CreateRoom});
+        } else if (buffer.trim() === "/dump") {
+            command = true;
+            sendPacket(<DumpRoomInfoPacket>{type: PacketType.DumpRoomInfo, roomId: currentRoomId});
         } else if (buffer.trim().startsWith("/invite ")) {
             command = true;
             const inviteUserId = buffer.trim().substring("/invite ".length);
@@ -143,8 +147,8 @@ function onEvent(packet: EventPacket) {
     const event = packet.event;
     const displayName = event.sender === myUserId ? "You" : event.sender;
     ui.log.write(
-        `${displayName} | ${event.type} (state_key: ${JSON.stringify(event.state_key)}) ${JSON.stringify(
-            event.content,
-        )}`,
+        `${displayName} | ${event.event_id} ${event.type} (state_key: ${JSON.stringify(
+            event.state_key,
+        )}) ${JSON.stringify(event.content)}`,
     );
 }

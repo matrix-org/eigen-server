@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import {Express} from "express";
 import crypto from "crypto";
 import {
+    DumpRoomInfoPacket,
     ErrorPacket,
     EventPacket,
     InvitePacket,
@@ -18,6 +19,7 @@ import {RoomStore} from "../RoomStore";
 import {MatrixEvent, PDU} from "../models/event";
 import {InviteStore} from "../InviteStore";
 import {ParticipantRoom} from "../models/room/ParticipantRoom";
+import {HubRoom} from "../models/room/HubRoom";
 
 interface ChatClient {
     ws: WebSocket;
@@ -81,6 +83,8 @@ export class ClientServerApi {
                         return this.userInviteRoom(client, packet as InvitePacket);
                     case PacketType.Send:
                         return this.userSend(client, packet as SendPacket);
+                    case PacketType.DumpRoomInfo:
+                        return this.userWantsRoomDump(client, packet as DumpRoomInfoPacket);
                 }
             });
         });
@@ -101,8 +105,8 @@ export class ClientServerApi {
         }
     }
 
-    private sendEventToClient(client: ChatClient, event: MatrixEvent) {
-        if (event.type === "m.room.member") {
+    private sendEventToClient(client: ChatClient, event: MatrixEvent, raw = false) {
+        if (event.type === "m.room.member" && !raw) {
             const membership = event.content["membership"];
             if (membership === "join") {
                 this.sendToClient(client, {
@@ -192,6 +196,29 @@ export class ClientServerApi {
                 this.sendToClient(client, {
                     type: PacketType.Error,
                     message: (e as Error)?.message ?? "Unknown error",
+                    originalPacket: packet,
+                } as ErrorPacket);
+            }
+        }
+    }
+
+    private async userWantsRoomDump(client: ChatClient, packet: DumpRoomInfoPacket) {
+        const room = this.roomStore.getRoom(packet.roomId);
+        if (!room) {
+            this.sendToClient(client, {
+                type: PacketType.Error,
+                message: "Unknown room",
+                originalPacket: packet,
+            } as ErrorPacket);
+        } else {
+            if (room instanceof HubRoom) {
+                for (const event of room.orderedEvents) {
+                    this.sendEventToClient(client, event, true);
+                }
+            } else {
+                this.sendToClient(client, {
+                    type: PacketType.Error,
+                    message: "Room is not a HubRoom and cannot be introspected",
                     originalPacket: packet,
                 } as ErrorPacket);
             }
