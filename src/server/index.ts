@@ -7,6 +7,9 @@ import {SelfSigningKey} from "./SelfSigningKey";
 import {FederationServer} from "./FederationServer";
 import bodyParser from "body-parser";
 import {InviteStore} from "./InviteStore";
+import * as sourceMapSupport from "source-map-support";
+
+sourceMapSupport.install();
 
 const port: number = Number(process.env["ES_PORT"] ?? 3000);
 const serverName = `${process.env["ES_HOSTNAME"] || "localhost"}:${port}`;

@@ -12,6 +12,9 @@ import {
     RoomJoinedPacket,
     SendPacket,
 } from "../server/client_server_api/packets";
+import * as sourceMapSupport from "source-map-support";
+
+sourceMapSupport.install();
 
 const ui = new inquirer.ui.BottomBar();
 
