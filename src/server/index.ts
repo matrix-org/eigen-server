@@ -9,7 +9,7 @@ import bodyParser from "body-parser";
 import {InviteStore} from "./InviteStore";
 
 const port: number = Number(process.env["LM_PORT"] ?? 3000);
-const serverName = `localhost:${port}`;
+const serverName = `${process.env["LM_HOSTNAME"] || "localhost"}:${port}`;
 const app = express();
 app.use(bodyParser.json());
 

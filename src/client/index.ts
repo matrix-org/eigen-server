@@ -91,7 +91,7 @@ process.stdin.on("data", (key: string) => {
     render();
 });
 
-const ws = new WebSocket(`ws://localhost:${process.env["LM_PORT"] ?? 3000}/client`);
+const ws = new WebSocket(`ws://${process.env["LM_HOSTNAME"] || "localhost"}:${process.env["LM_PORT"] ?? 3000}/client`);
 ws.on("open", () => {
     ui.log.write("* | Connected");
 });
