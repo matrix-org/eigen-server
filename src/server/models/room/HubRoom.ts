@@ -197,16 +197,25 @@ export class HubRoom extends ParticipantRoom {
     }
 
     public async doSendJoin(join: PDU, expectedEventId: string): Promise<{chain: PDU[]; event: PDU; state: PDU[]}> {
-        const redacted = this.roomVersion.redact(join);
-        const eventId = `$${calculateReferenceHash(redacted)}`;
+        let redacted = this.roomVersion.redact(join);
+        let eventId = `$${calculateReferenceHash(redacted)}`;
         if (eventId !== expectedEventId) {
             throw new Error("Mismatched event ID");
         }
 
         // Hash & sign the event.
         const hashed = calculateContentHash(join);
+        redacted = this.roomVersion.redact({...join, hashes: hashed.hashes});
         const signed = Runtime.signingKey.signJson(redacted);
         const realPdu: PDU = {...join, hashes: hashed.hashes, signatures: signed.signatures};
+        eventId = `$${calculateReferenceHash(redacted)}`;
+
+        // DAG-capable servers don't create LPDUs, check the event ID is still sane
+        if (typeof realPdu.hub_server !== "string") {
+            if (eventId !== expectedEventId) {
+                throw new Error("Mismatched event ID");
+            }
+        }
 
         // Create the event and add it to the room.
         const event: MatrixEvent = {...realPdu, event_id: eventId};
