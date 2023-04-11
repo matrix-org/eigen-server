@@ -20,9 +20,14 @@ Requires NodeJS 18.x and yarn.
 1. Clone repo
 2. `yarn install`
 
-To start the demo (awful) client: `yarn dev:client`
+To start the awful demo client: `yarn dev:client`
 
 To start the demo server: `yarn dev:server`
+
+Client environment variables:
+* `ES_CREATE_ROOM`: When `true`, the client will create a new room on startup.
+* `ES_SEND_INVITE`: When set to a string, the client will auto-invite that user ID to the first room it joins/creates.
+* `ES_LOCALPART`: The desired localpart for the client. If already picked then the server will return a random localpart.
 
 ### Setting up a demo
 
