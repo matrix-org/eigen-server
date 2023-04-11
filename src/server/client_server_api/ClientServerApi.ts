@@ -62,7 +62,17 @@ export class ClientServerApi {
     public registerRoutes(app: Express) {
         const wsApp = expressWs(app).app;
         wsApp.ws("/client", (ws, req) => {
-            const client = {ws, userId: `@${crypto.randomUUID()}:${this.serverName}`};
+            let localpart: string = crypto.randomUUID();
+            if (req.query["preferredLocalpart"]) {
+                if (typeof req.query["preferredLocalpart"] === "string") {
+                    localpart = req.query["preferredLocalpart"];
+                }
+            }
+            let userId = `@${localpart}:${this.serverName}`;
+            if (this.clients.some(c => c.userId === userId)) {
+                userId = `@${crypto.randomUUID()}:${this.serverName}`;
+            }
+            const client = {ws, userId: userId};
             ws.on("close", () => {
                 this.clients = this.clients.filter(c => c.ws != ws);
                 console.log(`${client.userId} disconnected`);

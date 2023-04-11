@@ -94,7 +94,11 @@ process.stdin.on("data", (key: string) => {
     render();
 });
 
-const ws = new WebSocket(`ws://${process.env["ES_HOSTNAME"] || "localhost"}:${process.env["ES_PORT"] ?? 3000}/client`);
+const ws = new WebSocket(
+    `ws://${process.env["ES_HOSTNAME"] || "localhost"}:${
+        process.env["ES_PORT"] ?? 3000
+    }/client?preferredLocalpart=${encodeURIComponent(process.env["ES_LOCALPART"] ?? "")}`,
+);
 ws.on("open", () => {
     ui.log.write("* | Connected");
 });
