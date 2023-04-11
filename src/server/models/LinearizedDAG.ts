@@ -4,6 +4,7 @@ import {FederationClient} from "../FederationClient";
 import {getDomainFromId} from "../util/id";
 import {RoomVersion} from "../room_versions/RoomVersion";
 import EventEmitter from "events";
+import {FunctionQueue} from "../util/FunctionQueue";
 
 const LockKey = "events";
 
@@ -19,7 +20,8 @@ export class LinearizedDAG {
     private seenIds = new Set<string>();
     private seenIdsCopy = new Set<string>();
     private lock = new AsyncLock();
-    protected emitter = new EventEmitter();
+    private emitter = new EventEmitter();
+    private emitQueue = new FunctionQueue();
 
     public constructor(private roomVersion: RoomVersion) {}
 
@@ -40,6 +42,7 @@ export class LinearizedDAG {
                     await this.doInsert(event);
                 }
                 this.commitTransaction();
+                this.emitQueue.run();
                 done();
             } catch (e) {
                 if (!(e instanceof Error)) {
@@ -55,7 +58,7 @@ export class LinearizedDAG {
         if (this.eventsCopy.length === 0) {
             this.roomVersion.checkAuth(event, []);
             this.eventsCopy.push(event);
-            this.emitter.emit("event", event);
+            this.queueEventEmit(event);
             return;
         }
 
@@ -99,7 +102,7 @@ export class LinearizedDAG {
                 this.roomVersion.checkAuth(event, buffer);
                 this.seenIdsCopy.add(event.event_id);
                 this.eventsCopy.splice(i + 1, 0, event);
-                this.emitter.emit("event", event);
+                this.queueEventEmit(event);
                 return;
             }
         }
@@ -126,6 +129,10 @@ export class LinearizedDAG {
     private commitTransaction() {
         this.events = this.eventsCopy;
         this.seenIds = this.seenIdsCopy;
+    }
+
+    private queueEventEmit(event: MatrixEvent) {
+        this.emitQueue.add(() => this.emitter.emit("event", event));
     }
 
     public on(event: "event", fn: (event: MatrixEvent) => void): void;
