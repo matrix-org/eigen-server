@@ -29,6 +29,7 @@ ui.log.write("");
 let buffer: string = "";
 let currentRoomId: string | null = null;
 let myUserId: string | null = null;
+let didFirstInvite = false;
 
 function render() {
     ui.updateBottomBar("> " + buffer);
@@ -131,12 +132,24 @@ function sendPacket(packet: Packet) {
 function onLogin(packet: LoginPacket) {
     myUserId = packet.userId;
     ui.log.write(`* | You are ${myUserId}`);
+    if (process.env["ES_CREATE_ROOM"] === "true") {
+        sendPacket({type: PacketType.CreateRoom});
+    }
 }
 
 function onJoin(join: RoomJoinedPacket) {
     if (join.targetUserId === myUserId) {
         currentRoomId = join.roomId;
         ui.log.write(`* | You are now chatting in ${currentRoomId}`);
+
+        if (!didFirstInvite && process.env["ES_SEND_INVITE"]) {
+            sendPacket(<InvitePacket>{
+                type: PacketType.Invite,
+                targetRoomId: currentRoomId,
+                targetUserId: process.env["ES_SEND_INVITE"],
+            });
+            didFirstInvite = true;
+        }
     } else if (join.roomId === currentRoomId) {
         ui.log.write(`* | ${join.targetUserId} joined the room`);
     }
