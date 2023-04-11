@@ -41,8 +41,17 @@ process.stdin.resume();
 process.stdin.setEncoding("utf-8");
 process.stdin.on("data", (key: string) => {
     if (key === "\u0003") {
-        process.exit(0); // Ctrl+C
+        // Ctrl+C
+        process.exit(0);
+    } else if (key === "\u0008") {
+        // Backspace
+        if (buffer.length > 0) {
+            buffer = buffer.substring(0, buffer.length - 1);
+            render();
+        }
+        return;
     } else if (key === "\u000d") {
+        // Enter
         let command = false;
         if (buffer.trim() === "\\q") {
             process.exit(0);

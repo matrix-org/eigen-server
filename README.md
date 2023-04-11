@@ -43,7 +43,6 @@ Client environment variables:
 10. Send whatever text you like in either client and it should be received on the other end. This will be going over local federation.
 
 Some additional notes:
-* The terminal client doesn't support backspace. Just "send" the typo and it'll be fine.
 * All rooms and users are held in memory for now.
 
 ### Synapse demo
