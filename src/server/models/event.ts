@@ -10,6 +10,9 @@ export interface MatrixEvent {
     content: Record<string, any>;
     hashes: {
         sha256: string;
+        lpdu?: {
+            sha256: string;
+        };
     };
     signatures: {
         [domain: string]: {
@@ -18,7 +21,6 @@ export interface MatrixEvent {
     };
     auth_events: string[];
     prev_events: string[];
-    unsigned?: Record<string, any>;
 }
 
 export interface StateEvent extends MatrixEvent {
@@ -31,7 +33,11 @@ export interface ClientFriendlyMatrixEvent
 }
 
 export interface LinearizedPDU extends Omit<MatrixEvent, "event_id" | "auth_events" | "prev_events" | "hashes"> {
-    // no additional fields
+    hashes: {
+        lpdu: {
+            sha256: string;
+        };
+    };
 }
 
 export interface PDU extends Omit<MatrixEvent, "event_id"> {
@@ -39,3 +45,16 @@ export interface PDU extends Omit<MatrixEvent, "event_id"> {
 }
 
 export type AnyPDU = LinearizedPDU | PDU;
+
+export type InterstitialLPDU = LinearizedPDU & Partial<Exclude<Omit<PDU, "hashes">, keyof LinearizedPDU>>;
+
+export interface StrippedRoomEvent {
+    type: string;
+    sender: string;
+    content: Record<string, any>;
+    state_key?: string;
+}
+
+export interface StrippedStateEvent extends StrippedRoomEvent {
+    state_key: string;
+}

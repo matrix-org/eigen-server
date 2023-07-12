@@ -1,5 +1,5 @@
 import {RoomVersion} from "../RoomVersion";
-import {AnyPDU, LinearizedPDU, MatrixEvent, PDU} from "../../models/event";
+import {AnyPDU, InterstitialLPDU, MatrixEvent, PDU, StrippedRoomEvent} from "../../models/event";
 import {CurrentRoomState} from "../../models/CurrentRoomState";
 import {getDomainFromId} from "../../util/id";
 import {PowerLevels} from "../../models/PowerLevels";
@@ -26,7 +26,7 @@ const PduKeepFields: RedactConfig = {
         "hub_server",
     ],
     contentFields: {
-        "m.room.member": ["membership", "join_authorised_via_users_server"],
+        "m.room.member": ["membership"],
         "m.room.create": ["room_version"], // TODO: Other fields too
         "m.room.join_rules": ["join_rule", "allow"],
         "m.room.power_levels": [
@@ -101,6 +101,23 @@ const EventSchema: Schema = {
                     nullable: false,
                     minLength: 1, // probably more, honestly
                 },
+                lpdu: {
+                    type: "object",
+                    nullable: false,
+                    properties: {
+                        sha256: {
+                            type: "string",
+                            nullable: false,
+                            minLength: 1, // probably more, honestly
+                        },
+                    },
+                    required: ["sha256"],
+                    errorMessage: {
+                        properties: {
+                            sha256: "The LPDU sha256 hash is required and should be a non-empty string",
+                        },
+                    },
+                },
             },
             required: ["sha256"],
             errorMessage: {
@@ -129,11 +146,6 @@ const EventSchema: Schema = {
                     },
                 },
             },
-        },
-        unsigned: {
-            type: "object",
-            nullable: false,
-            additionalProperties: true,
         },
         auth_events: {
             type: "array",
@@ -170,7 +182,6 @@ const EventSchema: Schema = {
             sender: "The sender should be a string prefixed with `@` and contain a `:`, and is required",
             content: "The event content should at least be a defined object, and is required",
             origin_server_ts: "The event timestamp should be a number, and is required",
-            unsigned: "The event's unsigned content should be a defined object",
             hub_server: "The hub server should be a string representing a domain and is required",
             hashes: "Hashes should be an object with a sha256 field",
             signatures: "Signatures should be an object mapping domain to key ID to signature",
@@ -181,11 +192,11 @@ const EventSchema: Schema = {
 };
 const TestEventFormatFn = ajv.compile(EventSchema);
 
-export class IDMimiLinearized00 implements RoomVersion {
-    public static readonly Identifier = "org.matrix.i-d.ralston-mimi-linearized-matrix.00";
+export class IDMimiLinearized02 implements RoomVersion {
+    public static readonly Identifier = "org.matrix.i-d.ralston-mimi-linearized-matrix.02";
 
     public get id(): string {
-        return IDMimiLinearized00.Identifier;
+        return IDMimiLinearized02.Identifier;
     }
 
     public async checkValidity(event: PDU, keyStore: KeyStore): Promise<void> {
@@ -213,19 +224,21 @@ export class IDMimiLinearized00 implements RoomVersion {
                 throw new Error(`${event.type}: Validation Failed: Signature error on hub_server`);
             }
 
-            if (origin !== event.hub_server) {
-                const linearizedPdu: LinearizedPDU & Partial<Exclude<PDU, keyof LinearizedPDU>> = JSON.parse(
-                    JSON.stringify(event),
-                );
-                delete linearizedPdu["auth_events"];
-                delete linearizedPdu["prev_events"];
-                delete linearizedPdu["hashes"];
+            const linearizedPdu: InterstitialLPDU = JSON.parse(JSON.stringify(event));
+            delete linearizedPdu["auth_events"];
+            delete linearizedPdu["prev_events"];
+            linearizedPdu["hashes"] = {lpdu: linearizedPdu["hashes"]["lpdu"]};
 
-                // Verify LPDU signature from origin
-                redacted = this.redact(linearizedPdu);
-                if (!(await keyStore.validateDomainSignature(redacted, origin))) {
-                    throw new Error(`${event.type}: Validation Failed: Signature error from origin (LPDU)`);
-                }
+            // Verify LPDU signature from origin
+            redacted = this.redact(linearizedPdu);
+            if (!(await keyStore.validateDomainSignature(redacted, origin))) {
+                throw new Error(`${event.type}: Validation Failed: Signature error from origin (LPDU)`);
+            }
+
+            // Check LPDU content hash
+            const hash = calculateContentHash(linearizedPdu).hashes.sha256;
+            if (hash !== event.hashes.lpdu!.sha256) {
+                throw new Error(`${event.type}: Validation Failed: Invalid LPDU content hash`);
             }
         } else {
             // Verify sender signed PDU
@@ -248,8 +261,8 @@ export class IDMimiLinearized00 implements RoomVersion {
         // First we need to establish "current state"
         const currentState = new CurrentRoomState(allEvents);
 
-        // Now we run the auth rules. These are v10's rules with some modifications.
-        // https://spec.matrix.org/v1.6/rooms/v10/#authorization-rules
+        // Now we run the auth rules
+        // https://datatracker.ietf.org/doc/html/draft-ralston-mimi-linearized-matrix-03#name-authorization-rules
 
         if (event.type === "m.room.create") {
             if (allEvents.length) {
@@ -266,18 +279,12 @@ export class IDMimiLinearized00 implements RoomVersion {
         }
 
         // Validate the auth events
-        // TODO: Auth rule 2 - https://github.com/matrix-org/linearized-matrix/issues/23
-
-        // TODO: Validate the event was sent by the hub server if a hub_server is set
-        // https://github.com/matrix-org/linearized-matrix/issues/25
+        // const expectedAuthEvents = this.selectAuthEvents(event, currentState);
+        // TODO: Do we care about auth events at all??
+        // https://github.com/matrix-org/linearized-matrix/issues/23
 
         const createEvent = currentState.get("m.room.create", "");
         if (!createEvent) throw new Error(`${event.type}: invalid state - no room create event`);
-        if (createEvent.content["m.federate"] === false) {
-            if (getDomainFromId(event.sender) != getDomainFromId(createEvent.sender)) {
-                throw new Error(`${event.type}: federation disallowed`);
-            }
-        }
 
         const joinRulesEv = currentState.get("m.room.join_rules", "");
         // TODO: Verify default state - https://github.com/matrix-org/linearized-matrix/issues/7
@@ -296,14 +303,6 @@ export class IDMimiLinearized00 implements RoomVersion {
 
             const currentTargetMembershipEv = currentState.get("m.room.member", event.state_key);
             const currentTargetMembership = currentTargetMembershipEv?.content["membership"] ?? "leave";
-
-            if (event.content["join_authorised_via_users_server"]) {
-                // TODO: Validate signature (should we do this as part of `isValid`?)
-                // https://github.com/matrix-org/linearized-matrix/issues/5
-                // if (!validSignature(event, getDomainFromId(event.content["join_authorised_via_users_server"]))) {
-                //   return false; // invalid
-                // }
-            }
 
             if (event.content["membership"] === "join") {
                 if (allEvents.length === 1 && createEvent.sender === event.sender) {
@@ -341,12 +340,6 @@ export class IDMimiLinearized00 implements RoomVersion {
                 }
                 return; // allow
             } else if (event.content["membership"] === "invite") {
-                if (event.content["third_party_invite"] !== undefined) {
-                    // TODO: Validate 3pid invite (4.4.1 of auth rules)
-                    // https://github.com/matrix-org/linearized-matrix/issues/4
-                    throw new Error(`${event.type}: third_party_invite support not implemented`);
-                }
-
                 if (senderMembership !== "join") {
                     throw new Error(`${event.type}: sender not in room`);
                 }
@@ -415,16 +408,6 @@ export class IDMimiLinearized00 implements RoomVersion {
         if (senderMembership !== "join") {
             throw new Error(`${event.type}: sender not in room`);
         }
-
-        if (event.type === "m.room.third_party_invite") {
-            if (powerLevels.canUserDo(event.sender, "invite")) {
-                return; // allow
-            } else {
-                throw new Error(`${event.type}: cannot invite other users`);
-            }
-        }
-
-        // TODO: Check m.room.hub rules - https://github.com/matrix-org/linearized-matrix/issues/26
 
         if (!powerLevels.canUserSend(event.sender, event.type, event.state_key !== undefined)) {
             throw new Error(`${event.type}: power levels do not permit sending this event`);
@@ -622,5 +605,39 @@ export class IDMimiLinearized00 implements RoomVersion {
 
     public redact(event: AnyPDU | Omit<AnyPDU, "signatures">): object {
         return redactObject(event, PduKeepFields);
+    }
+
+    public selectAuthEvents(forEvent: StrippedRoomEvent, currentState: CurrentRoomState): MatrixEvent[] {
+        const selected: MatrixEvent[] = [];
+        if (forEvent.type === "m.room.create") return selected;
+
+        selected.push(currentState.get("m.room.create", "")!);
+
+        const powerLevelsEvent = currentState.get("m.room.power_levels", "");
+        if (powerLevelsEvent) {
+            selected.push(powerLevelsEvent);
+        }
+
+        const senderMembershipEvent = currentState.get("m.room.member", forEvent.sender);
+        if (senderMembershipEvent) {
+            selected.push(senderMembershipEvent);
+        }
+
+        if (forEvent.type === "m.room.member" && forEvent.sender !== forEvent.state_key) {
+            const targetMembershipEvent = currentState.get("m.room.member", forEvent.state_key!);
+            if (targetMembershipEvent) {
+                selected.push(targetMembershipEvent);
+            }
+        }
+        if (forEvent.type === "m.room.member") {
+            if (["invite", "join"].includes(forEvent.content["membership"])) {
+                const joinRulesEvent = currentState.get("m.room.join_rules", "");
+                if (joinRulesEvent) {
+                    selected.push(joinRulesEvent);
+                }
+            }
+        }
+
+        return selected;
     }
 }

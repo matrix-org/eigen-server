@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 import {getDomainFromId} from "../../util/id";
-import {LinearizedPDU, MatrixEvent, PDU} from "../event";
+import {InterstitialLPDU, LinearizedPDU, MatrixEvent, PDU} from "../event";
 import {DefaultRoomVersion, getRoomVersionImpl} from "../../room_versions/map";
 import {calculateContentHash, calculateReferenceHash} from "../../util/hashing";
 import {Runtime} from "../../Runtime";
@@ -14,7 +14,7 @@ export class HubRoom extends ParticipantRoom {
         return this.timeline.currentEvents; // clones array internally
     }
 
-    public async sendEvent(event: LinearizedPDU): Promise<void> {
+    public async sendEvent(event: MatrixEvent | LinearizedPDU): Promise<void> {
         if (this.hubDomain !== Runtime.signingKey.serverName) {
             throw new Error("Runtime error: Asked to send an event as a hub but we're not the hub");
         }
@@ -25,7 +25,7 @@ export class HubRoom extends ParticipantRoom {
         await this.reallySendEvent(fullEvent);
     }
 
-    private formalizeEvent(event: LinearizedPDU): MatrixEvent {
+    private formalizeEvent(event: MatrixEvent | LinearizedPDU): MatrixEvent {
         const pdu: Omit<PDU, "hashes"> = {
             ...event,
             auth_events: [],
@@ -45,11 +45,6 @@ export class HubRoom extends ParticipantRoom {
             const senderEvent = state.get("m.room.member", event.sender);
             if (senderEvent) {
                 authIds.push(senderEvent.event_id);
-            }
-
-            const hubEvent = state.get("m.room.hub", "");
-            if (hubEvent) {
-                authIds.push(hubEvent.event_id);
             }
 
             if (event.type === "m.room.member") {
@@ -158,7 +153,7 @@ export class HubRoom extends ParticipantRoom {
         await this.timeline.insertEvents([event]); // checks auth internally
     }
 
-    public createJoinTemplate(userId: string): LinearizedPDU | undefined {
+    public createJoinTemplate(userId: string): InterstitialLPDU | undefined {
         const ev = this.formalizeEvent(
             this.createEvent({
                 type: "m.room.member",
@@ -178,11 +173,9 @@ export class HubRoom extends ParticipantRoom {
 
         const lpdu: PDU & Partial<Omit<MatrixEvent, keyof LinearizedPDU>> = ev;
 
-        // Remove the event ID, hashes, signatures, and unsigned.
+        // Remove the event ID, hashes, and signatures
         // TODO: @@TR: FIX TS
         delete lpdu["event_id"];
-        // @ts-ignore
-        delete lpdu["unsigned"];
         // @ts-ignore
         delete lpdu["signatures"];
         // @ts-ignore
@@ -191,7 +184,8 @@ export class HubRoom extends ParticipantRoom {
         // We don't know if the server asking to join uses a hub or not.
         delete lpdu["hub_server"];
 
-        return lpdu;
+        // TODO: Return a correct template/type
+        return lpdu as any;
     }
 
     public async doSendJoin(join: PDU, expectedEventId: string): Promise<{chain: PDU[]; event: PDU; state: PDU[]}> {

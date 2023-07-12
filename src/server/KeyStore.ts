@@ -86,7 +86,6 @@ export class KeyStore {
 
         const signatures = clone["signatures"];
         delete clone["signatures"];
-        delete clone["unsigned"];
 
         if (!signatures?.[domain]?.[keyId]) {
             throw new Error(`Missing signatures from domain: ${domain} (${keyId})`);

@@ -34,18 +34,13 @@ export class SelfSigningKey {
     public signJson(json: any): any {
         const clone = JSON.parse(JSON.stringify(json));
         const signatures = clone["signatures"];
-        const unsigned = clone["unsigned"];
         delete clone["signatures"];
-        delete clone["unsigned"];
         const canonical = canonicalSerialize(clone);
         const signature = unpaddedBase64Encode(
             Buffer.from(forge.pki.ed25519.sign({message: Buffer.from(canonical), privateKey: this.privateKey})),
         );
         if (signatures !== undefined) {
             clone["signatures"] = signatures;
-        }
-        if (unsigned !== undefined) {
-            clone["unsigned"] = unsigned;
         }
         if (!clone["signatures"]) {
             clone["signatures"] = {};

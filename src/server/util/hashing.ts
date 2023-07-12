@@ -14,11 +14,14 @@ export function calculateContentHash(
     const clone = JSON.parse(JSON.stringify(event));
 
     // Step 2: remove fields we don't want to hash
-    const unsigned = clone["unsigned"];
     const signatures = clone["signatures"];
-    delete clone["unsigned"];
     delete clone["signatures"];
-    delete clone["hashes"];
+
+    if (clone["hashes"]?.["sha256"] !== undefined) {
+        clone["hashes"] = {lpdu: clone["hashes"]["lpdu"]};
+    } else {
+        delete clone["hashes"];
+    }
 
     // Step 3: canonicalize
     const canonical = canonicalSerialize(clone);
@@ -27,10 +30,10 @@ export function calculateContentHash(
     const hash = createHash("sha256").update(canonical).digest();
 
     // Step 5: append base64'd hash and return
-    clone["unsigned"] = unsigned;
     clone["signatures"] = signatures;
     clone["hashes"] = {
         sha256: unpaddedBase64Encode(hash),
+        lpdu: clone["hashes"]?.["lpdu"],
     };
     return clone;
 }
@@ -40,9 +43,7 @@ export function calculateReferenceHash(redactedEvent: object): string {
     const clone = JSON.parse(JSON.stringify(redactedEvent));
 
     // Step 2: remove fields we don't want to hash
-    delete clone["unsigned"];
     delete clone["signatures"];
-    delete clone["age_ts"]; // https://github.com/matrix-org/matrix-spec/issues/1489
 
     // Step 3: canonicalize
     const canonical = canonicalSerialize(clone);

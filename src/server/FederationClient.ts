@@ -1,7 +1,7 @@
 import {FederationConnectionCache, FederationUrl} from "./FederationConnectionCache";
 import {LinearizedPDU, MatrixEvent, PDU} from "./models/event";
 import {getRoomVersionImpl, getSupportedVersions} from "./room_versions/map";
-import {calculateReferenceHash} from "./util/hashing";
+import {calculateContentHash, calculateReferenceHash} from "./util/hashing";
 import {createHash} from "crypto";
 import {Runtime} from "./Runtime";
 import {RoomVersion} from "./room_versions/RoomVersion";
@@ -97,7 +97,7 @@ export class FederationClient {
         await res.text(); // consume response
     }
 
-    public async sendLinearizedPdus(events: LinearizedPDU[]): Promise<void> {
+    public async sendLinearizedPdus(events: (MatrixEvent | LinearizedPDU)[]): Promise<void> {
         return this.sendEvents(events as MatrixEvent[]); // yes, we cheat badly here
     }
 
@@ -115,7 +115,7 @@ export class FederationClient {
             },
         });
         let json = await res.json();
-        const event: PDU = json.event;
+        const event: LinearizedPDU = json.event;
         const roomVersion = json.room_version;
         const version = getRoomVersionImpl(roomVersion);
         if (!version) {
@@ -139,6 +139,7 @@ export class FederationClient {
         delete lpdu["auth_events"];
         delete lpdu["prev_events"];
         delete lpdu["hashes"];
+        event.hashes = {lpdu: calculateContentHash(lpdu).hashes};
 
         // sign it
         const redacted = version.redact(lpdu);
