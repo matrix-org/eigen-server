@@ -25,11 +25,15 @@ export class HubRoom extends ParticipantRoom {
         await this.reallySendEvent(fullEvent);
     }
 
-    private formalizeEvent(event: MatrixEvent | LinearizedPDU): MatrixEvent {
-        const pdu: Omit<PDU, "hashes"> = {
+    private formalizeEvent(event: PDU | LinearizedPDU): MatrixEvent {
+        const pdu: PDU = {
             ...event,
             auth_events: [],
             prev_events: [],
+            hashes: {
+                sha256: "",
+                lpdu: event.hashes.lpdu,
+            },
         };
 
         // First: auth & prev events selection
@@ -77,7 +81,7 @@ export class HubRoom extends ParticipantRoom {
         }
 
         const hashed = calculateContentHash(pdu);
-        const realPdu: PDU = {...pdu, hashes: hashed.hashes};
+        const realPdu: PDU = {...pdu, hashes: {...hashed.hashes, lpdu: pdu.hashes.lpdu}};
 
         const redacted = this.roomVersion.redact(realPdu);
         const signed = Runtime.signingKey.signJson(redacted);
@@ -195,22 +199,10 @@ export class HubRoom extends ParticipantRoom {
             throw new Error("Mismatched event ID");
         }
 
-        // Hash & sign the event.
-        const hashed = calculateContentHash(join);
-        redacted = this.roomVersion.redact({...join, hashes: hashed.hashes});
-        const signed = Runtime.signingKey.signJson(redacted);
-        const realPdu: PDU = {...join, hashes: hashed.hashes, signatures: signed.signatures};
-        eventId = `$${calculateReferenceHash(redacted)}`;
-
-        // DAG-capable servers don't create LPDUs, check the event ID is still sane
-        if (typeof realPdu.hub_server !== "string") {
-            if (eventId !== expectedEventId) {
-                throw new Error("Mismatched event ID");
-            }
-        }
+        // Append the PDU fields
+        const event = this.formalizeEvent(join);
 
         // Create the event and add it to the room.
-        const event: MatrixEvent = {...realPdu, event_id: eventId};
         await this.reallySendEvent(event);
 
         // TODO: This is horribly inefficient

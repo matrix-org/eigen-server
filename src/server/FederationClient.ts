@@ -133,25 +133,36 @@ export class FederationClient {
             throw new Error("make_join produced invalid join event");
         }
 
-        // create the LPDU
-        event.hub_server = this.forDomain; // XXX: We're assuming they're a hub
-        const lpdu = JSON.parse(JSON.stringify(event));
-        delete lpdu["auth_events"];
-        delete lpdu["prev_events"];
-        delete lpdu["hashes"];
-        event.hashes = {lpdu: calculateContentHash(lpdu).hashes};
+        // Create the LPDU
+        const lpdu: Omit<LinearizedPDU, "signatures"> = {
+            type: event.type,
+            state_key: event.state_key,
+            sender: event.sender,
+            content: {
+                membership: event.content["membership"],
+            },
+            hub_server: this.forDomain, // XXX: We're assuming they're a hub
+            room_id: inviteEvent.room_id,
+            origin_server_ts: inviteEvent.origin_server_ts,
+            hashes: {
+                lpdu: {
+                    sha256: "", // calculated on next line
+                },
+            },
+        };
+        lpdu.hashes = {lpdu: calculateContentHash(lpdu).hashes};
+        delete (<any>lpdu).hashes.lpdu["lpdu"];
 
         // sign it
         const redacted = version.redact(lpdu);
-        const redactedPdu = version.redact(event);
         const signed = Runtime.signingKey.signJson(redacted);
-        const eventId = `$${calculateReferenceHash(redactedPdu)}`;
+        const eventId = `$${calculateReferenceHash(signed)}`;
 
         // submit it
         const sendJoinPath = `/_matrix/federation/v2/send_join/${encodeURIComponent(
             inviteEvent.room_id,
         )}/${encodeURIComponent(eventId)}`;
-        const content = {...event, signatures: signed.signatures};
+        const content = {...lpdu, signatures: signed.signatures};
         res = await fetch(`${(await this.getUrl()).httpsUrl}${sendJoinPath}`, {
             method: "PUT",
             body: JSON.stringify(content),

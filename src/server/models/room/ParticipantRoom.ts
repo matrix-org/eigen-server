@@ -57,7 +57,7 @@ export class ParticipantRoom implements Room {
                 lpdu: {sha256: ""},
             },
         };
-        if (this.hubDomain !== Runtime.signingKey.serverName) {
+        if (getDomainFromId(partial.sender) !== this.hubDomain) {
             template.hub_server = this.hubDomain;
 
             const template2 = JSON.parse(JSON.stringify(template));
