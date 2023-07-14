@@ -49,13 +49,13 @@ export class FederationClient {
     public async sendInvite(event: PDU, roomVersion: string): Promise<PDU> {
         const version = getRoomVersionImpl(roomVersion)!;
         const eventId = `$${calculateReferenceHash(version.redact(event))}`;
-        const path = `/_matrix/federation/v2/invite/${encodeURIComponent(event.room_id)}/${encodeURIComponent(
+        const path = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/invite/${encodeURIComponent(
             eventId,
         )}`;
         const content = {event: event, room_version: roomVersion};
 
         const res = await fetch(`${(await this.getUrl()).httpsUrl}${path}`, {
-            method: "PUT",
+            method: "POST",
             body: JSON.stringify(content),
             headers: {
                 "Content-Type": "application/json",
@@ -74,7 +74,9 @@ export class FederationClient {
             .update(events.map(e => e.event_id).join("|"))
             .digest()
             .toString("hex")}`;
-        const path = `/_matrix/federation/v1/send/${encodeURIComponent(txnId)}`;
+        const path = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send/${encodeURIComponent(
+            txnId,
+        )}`;
         const content = {
             pdus: events.map(e => {
                 const p: PDU & {event_id?: string} = JSON.parse(JSON.stringify(e)); // clone
@@ -159,12 +161,12 @@ export class FederationClient {
         const eventId = `$${calculateReferenceHash(signed)}`;
 
         // submit it
-        const sendJoinPath = `/_matrix/federation/v2/send_join/${encodeURIComponent(
-            inviteEvent.room_id,
-        )}/${encodeURIComponent(eventId)}`;
+        const sendJoinPath = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send_join/${encodeURIComponent(
+            eventId,
+        )}`;
         const content = {...lpdu, signatures: signed.signatures};
         res = await fetch(`${(await this.getUrl()).httpsUrl}${sendJoinPath}`, {
-            method: "PUT",
+            method: "POST",
             body: JSON.stringify(content),
             headers: {
                 "Content-Type": "application/json",
@@ -181,7 +183,9 @@ export class FederationClient {
     }
 
     public async getEvent(eventId: string, roomVersion: RoomVersion): Promise<MatrixEvent> {
-        const requestPath = `/_matrix/federation/v1/event/${encodeURIComponent(eventId)}`;
+        const requestPath = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/event/${encodeURIComponent(
+            eventId,
+        )}`;
         const res = await fetch(`${(await this.getUrl()).httpsUrl}${requestPath}`, {
             method: "GET",
             headers: {
@@ -195,7 +199,7 @@ export class FederationClient {
             throw new Error(JSON.stringify(json));
         }
 
-        const pdu: PDU = json["pdus"][0]; // it's a transaction response for some reason
+        const pdu: PDU = json;
         const redacted = roomVersion.redact(pdu);
         const actualEventId = `$${calculateReferenceHash(redacted)}`;
         if (actualEventId !== eventId) {

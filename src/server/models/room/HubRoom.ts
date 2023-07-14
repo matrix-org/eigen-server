@@ -192,13 +192,7 @@ export class HubRoom extends ParticipantRoom {
         return lpdu as any;
     }
 
-    public async doSendJoin(join: PDU, expectedEventId: string): Promise<{chain: PDU[]; event: PDU; state: PDU[]}> {
-        let redacted = this.roomVersion.redact(join);
-        let eventId = `$${calculateReferenceHash(redacted)}`;
-        if (eventId !== expectedEventId) {
-            throw new Error("Mismatched event ID");
-        }
-
+    public async doSendJoin(join: PDU): Promise<{chain: PDU[]; event: PDU; state: PDU[]}> {
         // Append the PDU fields
         const event = this.formalizeEvent(join);
 
