@@ -17,7 +17,8 @@ export function calculateContentHash(
     const signatures = clone["signatures"];
     delete clone["signatures"];
 
-    if (clone["hashes"]?.["sha256"] !== undefined) {
+    // If there's an lpdu field under hashes, keep it.
+    if (clone["hashes"]?.["lpdu"] !== undefined) {
         clone["hashes"] = {lpdu: clone["hashes"]["lpdu"]};
     } else {
         delete clone["hashes"];
