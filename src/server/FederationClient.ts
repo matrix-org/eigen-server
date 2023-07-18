@@ -60,7 +60,7 @@ export class FederationClient {
             headers: {
                 "Content-Type": "application/json",
                 // TODO Support multiple keys.
-                Authorization: this.getAuthHeader("PUT", path, content),
+                Authorization: this.getAuthHeader("POST", path, content),
             },
         });
         if (res.status !== 200) {
@@ -171,7 +171,7 @@ export class FederationClient {
             headers: {
                 "Content-Type": "application/json",
                 // TODO Support multiple keys.
-                Authorization: this.getAuthHeader("PUT", sendJoinPath, content),
+                Authorization: this.getAuthHeader("POST", sendJoinPath, content),
             },
         });
         json = await res.json();
