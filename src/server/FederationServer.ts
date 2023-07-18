@@ -6,7 +6,6 @@ import {KeyStore} from "./KeyStore";
 import {HubRoom} from "./models/room/HubRoom";
 import {getDomainFromId} from "./util/id";
 import {Runtime} from "./Runtime";
-import {calculateReferenceHash} from "./util/hashing";
 import {InviteStore} from "./InviteStore";
 import {CurrentRoomState} from "./models/CurrentRoomState";
 
