@@ -66,7 +66,6 @@ export class FederationServer {
 
         try {
             const event = req.body["event"] as PDU;
-            const eventId = `$${calculateReferenceHash(version.redact(event))}`;
             const room = this.roomStore.getRoom(event.room_id);
             if (room) {
                 return res.status(400).json({errcode: "M_UNKNOWN", error: "Already know of this room"});
@@ -74,13 +73,6 @@ export class FederationServer {
 
             // Validate the event
             await version.checkValidity(event, this.keyStore);
-
-            // Check event ID
-            const redacted = version.redact(event);
-            const calcEventId = `$${calculateReferenceHash(redacted)}`;
-            if (calcEventId !== eventId) {
-                return res.status(400).json({errcode: "M_UNKNOWN", error: "Event ID doesn't match"});
-            }
 
             // Validate event aspects
             if (event.type !== "m.room.member") {
