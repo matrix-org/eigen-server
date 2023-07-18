@@ -66,7 +66,7 @@ export class FederationServer {
 
         try {
             const event = req.body["event"] as PDU;
-            const eventId = calculateReferenceHash(version.redact(event));
+            const eventId = `$${calculateReferenceHash(version.redact(event))}`;
             const room = this.roomStore.getRoom(event.room_id);
             if (room) {
                 return res.status(400).json({errcode: "M_UNKNOWN", error: "Already know of this room"});
