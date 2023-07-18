@@ -6,24 +6,48 @@ import {KeyStore} from "./KeyStore";
 import {HubRoom} from "./models/room/HubRoom";
 import {getDomainFromId} from "./util/id";
 import {Runtime} from "./Runtime";
-import {calculateReferenceHash} from "./util/hashing";
 import {InviteStore} from "./InviteStore";
+import {CurrentRoomState} from "./models/CurrentRoomState";
 
 export class FederationServer {
     public constructor(private roomStore: RoomStore, private keyStore: KeyStore, private inviteStore: InviteStore) {}
 
     public registerRoutes(app: Express) {
         app.put("/_matrix/federation/v1/send/:txnId", this.onTransactionRequest.bind(this));
+        app.put(
+            "/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send/:txnId",
+            this.onTransactionRequest.bind(this),
+        );
         app.put("/_matrix/federation/v2/invite/:roomId/:eventId", this.onInviteRequest.bind(this));
+        app.post(
+            "/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/invite/:txnId",
+            this.onInviteRequest.bind(this),
+        );
         app.get("/_matrix/federation/v1/make_join/:roomId/:userId", this.onMakeJoinRequest.bind(this));
         app.put("/_matrix/federation/v2/send_join/:roomId/:eventId", this.onSendJoinRequest.bind(this));
+        app.post(
+            "/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send_join/:txnId",
+            this.onSendJoinRequest.bind(this),
+        );
         app.get("/_matrix/federation/v1/event_auth/:roomId/:eventId", this.onEventAuthRequest.bind(this));
         app.get("/_matrix/federation/v1/query/profile", this.onQueryProfile.bind(this));
-        app.get("/_matrix/federation/v1/event/:eventId", this.onEventRequest.bind(this));
+        app.get("/_matrix/federation/v1/event/:eventId", this.onEventRequestTxn.bind(this));
+        app.get(
+            "/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/event/:eventId",
+            this.onEventRequest.bind(this),
+        );
+        app.get("/_matrix/federation/v1/state/:roomId", this.onRoomStateRequest.bind(this));
+        app.get("/_matrix/federation/v1/state_ids/:roomId", this.onRoomStateIdsRequest.bind(this));
+        app.get(
+            "/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/backfill/:roomId",
+            this.onBackfillRequest.bind(this),
+        );
     }
 
     private async onInviteRequest(req: express.Request, res: express.Response) {
         // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Handle transaction IDs - https://github.com/matrix-org/eigen-server/issues/32
+        // TODO: Handle new invite logic flow (proxy send) - https://github.com/matrix-org/eigen-server/issues/33
 
         if (typeof req.body !== "object") {
             return res.status(400).json({errcode: "M_BAD_JSON"}); // we assume it was JSON, at least
@@ -39,26 +63,15 @@ export class FederationServer {
             return res.status(400).json({errcode: "M_UNSUPPORTED_ROOM_VERSION"});
         }
 
-        const roomId = req.params["roomId"];
-        const eventId = req.params["eventId"];
-
-        const room = this.roomStore.getRoom(roomId);
-        if (room) {
-            return res.status(400).json({errcode: "M_UNKNOWN", error: "Already know of this room"});
-        }
-
         try {
             const event = req.body["event"] as PDU;
+            const room = this.roomStore.getRoom(event.room_id);
+            if (room) {
+                return res.status(400).json({errcode: "M_UNKNOWN", error: "Already know of this room"});
+            }
 
             // Validate the event
             await version.checkValidity(event, this.keyStore);
-
-            // Check event ID
-            const redacted = version.redact(event);
-            const calcEventId = `$${calculateReferenceHash(redacted)}`;
-            if (calcEventId !== eventId) {
-                return res.status(400).json({errcode: "M_UNKNOWN", error: "Event ID doesn't match"});
-            }
 
             // Validate event aspects
             if (event.type !== "m.room.member") {
@@ -72,6 +85,7 @@ export class FederationServer {
             }
 
             // It's valid enough - sign it
+            const redacted = version.redact(event);
             const signed = Runtime.signingKey.signJson(redacted);
 
             // Store the invite (will inform clients down the line for us)
@@ -94,6 +108,8 @@ export class FederationServer {
         if (!Array.isArray(events)) {
             return res.status(400).json({errcode: "M_BAD_JSON"}); // we assume it was JSON, at least
         }
+
+        // TODO: Handle EDUs - https://github.com/matrix-org/eigen-server/issues/30
 
         for (const event of events) {
             const roomId = event["room_id"];
@@ -126,6 +142,7 @@ export class FederationServer {
             }
         }
 
+        // TODO: Report failures - https://github.com/matrix-org/eigen-server/issues/31
         res.json({});
     }
 
@@ -167,6 +184,7 @@ export class FederationServer {
     private async onSendJoinRequest(req: express.Request, res: express.Response) {
         // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
         // TODO: Check that server could own the requesting user too
+        // TODO: Handle transaction IDs - https://github.com/matrix-org/eigen-server/issues/32
 
         if (typeof req.body !== "object") {
             return res.status(400).json({errcode: "M_BAD_JSON"}); // we assume it was JSON, at least
@@ -182,7 +200,7 @@ export class FederationServer {
             res.status(400).json({errcode: "M_UNKNOWN", error: "Not a join event"});
         }
 
-        const room = this.roomStore.getRoom(req.params["roomId"]);
+        const room = this.roomStore.getRoom(event.room_id);
         if (!room) {
             return res.status(404).json({errcode: "M_NOT_FOUND"});
         }
@@ -196,7 +214,7 @@ export class FederationServer {
         }
 
         try {
-            const response = await room.doSendJoin(event, req.params["eventId"]);
+            const response = await room.doSendJoin(event);
             res.status(200).json({
                 auth_chain: response.chain,
                 state: response.state,
@@ -254,24 +272,127 @@ export class FederationServer {
         res.status(200).json({});
     }
 
-    private async onEventRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
-        // TODO: Check that server can receive this event.
-
+    private getEvent(eventId: string): MatrixEvent | undefined {
         // We don't know what room this event is in, so let's just query them all
         // TODO: Track event IDs as globally unique
+        // TODO: History visibility - https://github.com/matrix-org/eigen-server/issues/21
         for (const room of this.roomStore.allRooms) {
-            const event = room.getEvent(req.params["eventId"]);
+            const event = room.getEvent(eventId);
             if (!!event) {
-                // XXX: Why is this a transaction!?
-                return res.status(200).json({
-                    origin: Runtime.signingKey.serverName,
-                    origin_server_ts: new Date().getTime(),
-                    pdus: [event],
-                });
+                return event;
             }
         }
 
+        return undefined;
+    }
+
+    private async onEventRequestTxn(req: express.Request, res: express.Response) {
+        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
+
+        const event = this.getEvent(req.params["eventId"]);
+        if (!!event) {
+            // XXX: Why is this a transaction!?
+            return res.status(200).json({
+                origin: Runtime.signingKey.serverName,
+                origin_server_ts: new Date().getTime(),
+                pdus: [event],
+            });
+        }
+
         return res.status(404).json({errcode: "M_NOT_FOUND", error: "Exhausted all attempts to find event"});
+    }
+
+    private async onEventRequest(req: express.Request, res: express.Response) {
+        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
+
+        const event = this.getEvent(req.params["eventId"]);
+        if (!!event) {
+            return res.status(200).json(event);
+        }
+
+        return res.status(404).json({errcode: "M_NOT_FOUND", error: "Exhausted all attempts to find event"});
+    }
+
+    private getRoomState(roomId: string): [CurrentRoomState, MatrixEvent[]] | undefined {
+        const room = this.roomStore.getRoom(roomId);
+        if (!!room && room instanceof HubRoom) {
+            // TODO: History visibility - https://github.com/matrix-org/eigen-server/issues/21
+            const state = new CurrentRoomState(room.orderedEvents);
+            const authChain: MatrixEvent[] = [];
+            for (const ev of state.events) {
+                for (const id of ev.auth_events) {
+                    const authEv = room.getEvent(id);
+                    if (!!authEv) {
+                        authChain.push(authEv);
+                    } else {
+                        throw new Error(`Missing auth event: ${id}`);
+                    }
+                }
+            }
+            return [state, authChain];
+        }
+        return undefined;
+    }
+
+    private async onRoomStateRequest(req: express.Request, res: express.Response) {
+        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
+
+        const ret = this.getRoomState(req.params["roomId"]);
+        if (!!ret) {
+            const [state, chain] = ret;
+            return res.status(200).json({
+                auth_chain: chain,
+                pdus: state.events,
+            });
+        }
+
+        return res.status(404).json({errcode: "M_NOT_FOUND", error: "Exhausted all attempts to find room state"});
+    }
+
+    private async onRoomStateIdsRequest(req: express.Request, res: express.Response) {
+        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
+
+        const ret = this.getRoomState(req.params["roomId"]);
+        if (!!ret) {
+            const [state, chain] = ret;
+            return res.status(200).json({
+                auth_chain_ids: chain.map(e => e.event_id),
+                pdus_ids: state.events.map(e => e.event_id),
+            });
+        }
+
+        return res.status(404).json({errcode: "M_NOT_FOUND", error: "Exhausted all attempts to find room state"});
+    }
+
+    private async onBackfillRequest(req: express.Request, res: express.Response) {
+        const startAtId = req.query["v"];
+        let limit = Number(req.query["limit"]);
+
+        if (!Number.isFinite(limit) || typeof startAtId !== "string") {
+            return res.status(400).json({errcode: "M_NOT_JSON", error: "Invalid ID or limit"});
+        }
+
+        if (limit < 1 || limit > 10) {
+            limit = 10;
+        }
+
+        const room = this.roomStore.getRoom(req.params["roomId"]);
+        if (!!room && room instanceof HubRoom) {
+            const events = room.orderedEvents; // cloned, safe to manipulate
+            const idx = events.findIndex(e => e.event_id === startAtId);
+            const ret: MatrixEvent[] = [];
+            for (let i = idx; i > idx - limit && i >= 0; i--) {
+                ret.push(events[i]);
+            }
+            if (ret.length > 0) {
+                return res.status(200).json({pdus: ret});
+            }
+        }
+
+        return res.status(404).json({errcode: "M_NOT_FOUND", error: "Exhausted all attempts to find room events"});
     }
 }

@@ -1,7 +1,7 @@
 import {FederationConnectionCache, FederationUrl} from "./FederationConnectionCache";
 import {LinearizedPDU, MatrixEvent, PDU} from "./models/event";
 import {getRoomVersionImpl, getSupportedVersions} from "./room_versions/map";
-import {calculateReferenceHash} from "./util/hashing";
+import {calculateContentHash, calculateReferenceHash} from "./util/hashing";
 import {createHash} from "crypto";
 import {Runtime} from "./Runtime";
 import {RoomVersion} from "./room_versions/RoomVersion";
@@ -49,18 +49,18 @@ export class FederationClient {
     public async sendInvite(event: PDU, roomVersion: string): Promise<PDU> {
         const version = getRoomVersionImpl(roomVersion)!;
         const eventId = `$${calculateReferenceHash(version.redact(event))}`;
-        const path = `/_matrix/federation/v2/invite/${encodeURIComponent(event.room_id)}/${encodeURIComponent(
+        const path = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/invite/${encodeURIComponent(
             eventId,
         )}`;
         const content = {event: event, room_version: roomVersion};
 
         const res = await fetch(`${(await this.getUrl()).httpsUrl}${path}`, {
-            method: "PUT",
+            method: "POST",
             body: JSON.stringify(content),
             headers: {
                 "Content-Type": "application/json",
                 // TODO Support multiple keys.
-                Authorization: this.getAuthHeader("PUT", path, content),
+                Authorization: this.getAuthHeader("POST", path, content),
             },
         });
         if (res.status !== 200) {
@@ -74,7 +74,9 @@ export class FederationClient {
             .update(events.map(e => e.event_id).join("|"))
             .digest()
             .toString("hex")}`;
-        const path = `/_matrix/federation/v1/send/${encodeURIComponent(txnId)}`;
+        const path = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send/${encodeURIComponent(
+            txnId,
+        )}`;
         const content = {
             pdus: events.map(e => {
                 const p: PDU & {event_id?: string} = JSON.parse(JSON.stringify(e)); // clone
@@ -97,7 +99,7 @@ export class FederationClient {
         await res.text(); // consume response
     }
 
-    public async sendLinearizedPdus(events: LinearizedPDU[]): Promise<void> {
+    public async sendLinearizedPdus(events: (MatrixEvent | LinearizedPDU)[]): Promise<void> {
         return this.sendEvents(events as MatrixEvent[]); // yes, we cheat badly here
     }
 
@@ -115,7 +117,7 @@ export class FederationClient {
             },
         });
         let json = await res.json();
-        const event: PDU = json.event;
+        const event: LinearizedPDU = json.event;
         const roomVersion = json.room_version;
         const version = getRoomVersionImpl(roomVersion);
         if (!version) {
@@ -133,31 +135,43 @@ export class FederationClient {
             throw new Error("make_join produced invalid join event");
         }
 
-        // create the LPDU
-        event.hub_server = this.forDomain; // XXX: We're assuming they're a hub
-        const lpdu = JSON.parse(JSON.stringify(event));
-        delete lpdu["auth_events"];
-        delete lpdu["prev_events"];
-        delete lpdu["hashes"];
+        // Create the LPDU
+        const lpdu: Omit<LinearizedPDU, "signatures"> = {
+            type: event.type,
+            state_key: event.state_key,
+            sender: event.sender,
+            content: {
+                membership: event.content["membership"],
+            },
+            hub_server: this.forDomain, // XXX: We're assuming they're a hub
+            room_id: inviteEvent.room_id,
+            origin_server_ts: inviteEvent.origin_server_ts,
+            hashes: {
+                lpdu: {
+                    sha256: "", // calculated on next line
+                },
+            },
+        };
+        lpdu.hashes = {lpdu: calculateContentHash(lpdu).hashes};
+        delete (<any>lpdu).hashes.lpdu["lpdu"];
 
         // sign it
         const redacted = version.redact(lpdu);
-        const redactedPdu = version.redact(event);
         const signed = Runtime.signingKey.signJson(redacted);
-        const eventId = `$${calculateReferenceHash(redactedPdu)}`;
+        const eventId = `$${calculateReferenceHash(signed)}`;
 
         // submit it
-        const sendJoinPath = `/_matrix/federation/v2/send_join/${encodeURIComponent(
-            inviteEvent.room_id,
-        )}/${encodeURIComponent(eventId)}`;
-        const content = {...event, signatures: signed.signatures};
+        const sendJoinPath = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send_join/${encodeURIComponent(
+            eventId,
+        )}`;
+        const content = {...lpdu, signatures: signed.signatures};
         res = await fetch(`${(await this.getUrl()).httpsUrl}${sendJoinPath}`, {
-            method: "PUT",
+            method: "POST",
             body: JSON.stringify(content),
             headers: {
                 "Content-Type": "application/json",
                 // TODO Support multiple keys.
-                Authorization: this.getAuthHeader("PUT", sendJoinPath, content),
+                Authorization: this.getAuthHeader("POST", sendJoinPath, content),
             },
         });
         json = await res.json();
@@ -169,7 +183,9 @@ export class FederationClient {
     }
 
     public async getEvent(eventId: string, roomVersion: RoomVersion): Promise<MatrixEvent> {
-        const requestPath = `/_matrix/federation/v1/event/${encodeURIComponent(eventId)}`;
+        const requestPath = `/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/event/${encodeURIComponent(
+            eventId,
+        )}`;
         const res = await fetch(`${(await this.getUrl()).httpsUrl}${requestPath}`, {
             method: "GET",
             headers: {
@@ -183,7 +199,7 @@ export class FederationClient {
             throw new Error(JSON.stringify(json));
         }
 
-        const pdu: PDU = json["pdus"][0]; // it's a transaction response for some reason
+        const pdu: PDU = json;
         const redacted = roomVersion.redact(pdu);
         const actualEventId = `$${calculateReferenceHash(redacted)}`;
         if (actualEventId !== eventId) {

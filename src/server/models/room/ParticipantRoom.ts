@@ -1,8 +1,8 @@
 import {Room} from "./Room";
-import {ClientFriendlyMatrixEvent, LinearizedPDU, MatrixEvent, PDU} from "../event";
+import {ClientFriendlyMatrixEvent, InterstitialLPDU, LinearizedPDU, MatrixEvent, PDU} from "../event";
 import {RoomVersion} from "../../room_versions/RoomVersion";
 import {KeyStore} from "../../KeyStore";
-import {calculateReferenceHash} from "../../util/hashing";
+import {calculateContentHash, calculateReferenceHash} from "../../util/hashing";
 import {Runtime} from "../../Runtime";
 import {CurrentRoomState} from "../CurrentRoomState";
 import {getDomainFromId} from "../../util/id";
@@ -19,10 +19,6 @@ export class ParticipantRoom implements Room {
 
     public get hubDomain(): string {
         const state = this.currentState;
-        const hubEvent = state.get("m.room.hub", "");
-        if (!!hubEvent) {
-            return getDomainFromId(hubEvent.sender);
-        }
 
         const createEvent = state.get("m.room.create", "");
         if (!!createEvent) {
@@ -49,16 +45,27 @@ export class ParticipantRoom implements Room {
 
     public createEvent(
         partial: Omit<ClientFriendlyMatrixEvent, "room_id" | "origin_server_ts" | "event_id">,
-    ): LinearizedPDU {
+    ): InterstitialLPDU {
         const template: Omit<LinearizedPDU, "signatures"> = {
             room_id: this.roomId,
             type: partial.type,
             state_key: partial.state_key,
             sender: partial.sender,
             origin_server_ts: new Date().getTime(),
-            hub_server: this.hubDomain,
             content: partial.content,
+            hashes: {
+                lpdu: {sha256: ""},
+            },
         };
+        if (getDomainFromId(partial.sender) !== this.hubDomain) {
+            template.hub_server = this.hubDomain;
+
+            const template2 = JSON.parse(JSON.stringify(template));
+            delete template2["hashes"];
+            (<LinearizedPDU>template).hashes.lpdu = calculateContentHash(template2).hashes;
+        } else {
+            (<PDU>template).hashes = calculateContentHash(template).hashes;
+        }
         const redacted = this.roomVersion.redact(template);
         const signed = Runtime.signingKey.signJson(redacted);
         return {
@@ -93,14 +100,14 @@ export class ParticipantRoom implements Room {
         );
     }
 
-    public sendEvent(event: LinearizedPDU): Promise<void> {
+    public sendEvent(event: MatrixEvent | LinearizedPDU): Promise<void> {
         if (this.hubDomain === Runtime.signingKey.serverName) {
             throw new Error("Runtime error: Trying to send events to hub but we are the hub");
         }
         return new FederationClient(this.hubDomain).sendLinearizedPdus([event]);
     }
 
-    public async receiveEvent(event: LinearizedPDU): Promise<void> {
+    public async receiveEvent(event: PDU | LinearizedPDU): Promise<void> {
         if (this.hubDomain === Runtime.signingKey.serverName) {
             throw new Error("Runtime error: Override issue - not receiving events in a HubRoom");
         }
