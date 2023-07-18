@@ -85,6 +85,7 @@ export class FederationServer {
             }
 
             // It's valid enough - sign it
+            const redacted = version.redact(event);
             const signed = Runtime.signingKey.signJson(redacted);
 
             // Store the invite (will inform clients down the line for us)
