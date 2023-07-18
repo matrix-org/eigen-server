@@ -6,7 +6,6 @@ import {KeyStore} from "./KeyStore";
 import {HubRoom} from "./models/room/HubRoom";
 import {getDomainFromId} from "./util/id";
 import {Runtime} from "./Runtime";
-import {calculateReferenceHash} from "./util/hashing";
 import {InviteStore} from "./InviteStore";
 import {CurrentRoomState} from "./models/CurrentRoomState";
 
@@ -66,7 +65,6 @@ export class FederationServer {
 
         try {
             const event = req.body["event"] as PDU;
-            const eventId = calculateReferenceHash(version.redact(event));
             const room = this.roomStore.getRoom(event.room_id);
             if (room) {
                 return res.status(400).json({errcode: "M_UNKNOWN", error: "Already know of this room"});
@@ -74,13 +72,6 @@ export class FederationServer {
 
             // Validate the event
             await version.checkValidity(event, this.keyStore);
-
-            // Check event ID
-            const redacted = version.redact(event);
-            const calcEventId = `$${calculateReferenceHash(redacted)}`;
-            if (calcEventId !== eventId) {
-                return res.status(400).json({errcode: "M_UNKNOWN", error: "Event ID doesn't match"});
-            }
 
             // Validate event aspects
             if (event.type !== "m.room.member") {
@@ -94,6 +85,7 @@ export class FederationServer {
             }
 
             // It's valid enough - sign it
+            const redacted = version.redact(event);
             const signed = Runtime.signingKey.signJson(redacted);
 
             // Store the invite (will inform clients down the line for us)
