@@ -18,7 +18,9 @@ export function redactObject(obj: any, config: RedactConfig): any {
     newObj.content = {};
     if (Array.isArray(keepContent)) {
         for (const field of keepContent) {
-            newObj.content[field] = obj.content[field];
+            if (obj.content.hasOwnProperty(field)) {
+                newObj.content[field] = obj.content[field];
+            }
         }
     } else if (keepContent === KeepAllFields) {
         newObj.content = JSON.parse(JSON.stringify(obj.content));
