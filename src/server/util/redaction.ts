@@ -7,7 +7,9 @@ export type RedactConfig = {
 export function redactObject(obj: any, config: RedactConfig): any {
     const newObj: any = {};
     for (const field of config.keepTopLevel) {
-        newObj[field] = obj[field];
+        if (obj.hasOwnProperty(field)) {
+            newObj[field] = obj[field];
+        }
     }
 
     const keepContent = config.contentFields[obj["type"]] || [];

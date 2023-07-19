@@ -90,6 +90,7 @@ export class KeyStore {
         if (!signatures?.[domain]?.[keyId]) {
             throw new Error(`Missing signatures from domain: ${domain} (${keyId})`);
         }
+
         const signature = signatures[domain][keyId] as string;
         return forge.pki.ed25519.verify({
             message: Buffer.from(canonicalSerialize(clone)),

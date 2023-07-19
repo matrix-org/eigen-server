@@ -27,7 +27,7 @@ const PduKeepFields: RedactConfig = {
     ],
     contentFields: {
         "m.room.member": ["membership"],
-        "m.room.create": ["room_version"], // TODO: Other fields too
+        "m.room.create": ["room_version", "predecessor"], // TODO: Other fields too
         "m.room.join_rules": ["join_rule", "allow"],
         "m.room.power_levels": [
             "users",
@@ -243,6 +243,7 @@ export class IDMimiLinearized02 implements RoomVersion {
         } else {
             // Verify sender signed PDU
             let redacted = this.redact(event);
+            console.log("@@", event, redacted);
             if (!(await keyStore.validateDomainSignature(redacted, origin))) {
                 throw new Error(`${event.type}: Validation Failed: Signature error on origin (normal PDU)`);
             }
