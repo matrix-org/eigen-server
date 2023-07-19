@@ -235,8 +235,12 @@ export class IDMimiLinearized02 implements RoomVersion {
                 throw new Error(`${event.type}: Validation Failed: Signature error from origin (LPDU)`);
             }
 
-            // Check LPDU content hash
-            const hash = calculateContentHash(linearizedPdu).hashes.sha256;
+            // Check LPDU content hash, excluding the current LPDU hash from the check (as otherwise
+            // we'll check a hash of the hash instead).
+            const lpduNoHash: InterstitialLPDU = JSON.parse(JSON.stringify(linearizedPdu));
+            // @ts-ignore - see above
+            delete lpduNoHash.hashes;
+            const hash = calculateContentHash(lpduNoHash).hashes.sha256;
             if (hash !== event.hashes.lpdu!.sha256) {
                 throw new Error(`${event.type}: Validation Failed: Invalid LPDU content hash`);
             }
