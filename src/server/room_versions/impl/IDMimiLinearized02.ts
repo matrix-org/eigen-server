@@ -3,7 +3,7 @@ import {AnyPDU, InterstitialLPDU, MatrixEvent, PDU, StrippedRoomEvent} from "../
 import {CurrentRoomState} from "../../models/CurrentRoomState";
 import {getDomainFromId} from "../../util/id";
 import {PowerLevels} from "../../models/PowerLevels";
-import {RedactConfig, redactObject} from "../../util/redaction";
+import {KeepAllFields, RedactConfig, redactObject} from "../../util/redaction";
 import Ajv, {Schema} from "ajv";
 import AjvErrors from "ajv-errors";
 import {KeyStore} from "../../KeyStore";
@@ -27,7 +27,7 @@ const PduKeepFields: RedactConfig = {
     ],
     contentFields: {
         "m.room.member": ["membership"],
-        "m.room.create": ["room_version"], // TODO: Other fields too
+        "m.room.create": KeepAllFields,
         "m.room.join_rules": ["join_rule", "allow"],
         "m.room.power_levels": [
             "users",
