@@ -83,6 +83,10 @@ export class HubRoom extends ParticipantRoom {
         const hashed = calculateContentHash(pdu);
         const realPdu: PDU = {...pdu, hashes: {...hashed.hashes, lpdu: pdu.hashes.lpdu}};
 
+        if ((realPdu.hashes.lpdu?.sha256?.length ?? 0) === 0) {
+            delete realPdu.hashes.lpdu;
+        }
+
         const redacted = this.roomVersion.redact(realPdu);
         const signed = Runtime.signingKey.signJson(redacted);
         realPdu.signatures = signed.signatures;
