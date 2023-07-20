@@ -9,7 +9,7 @@ type ServerKeys = {
     expiresAt: number;
     verifyKeys: Record<string, string>;
     // TODO: We should probably support old_verify_keys too
-    // https://github.com/matrix-org/linearized-matrix/issues/12
+    // https://github.com/matrix-org/eigen-server/issues/12
 };
 
 export class KeyStore {

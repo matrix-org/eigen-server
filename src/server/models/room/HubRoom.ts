@@ -219,7 +219,7 @@ export class HubRoom extends ParticipantRoom {
         return {
             chain: authChain.map(e => toPdu(e)),
             // TODO: This is not how we're supposed to handle `state`
-            // TODO: https://github.com/matrix-org/linearized-matrix/issues/27
+            // TODO: https://github.com/matrix-org/eigen-server/issues/27
             // state: stateEvents.map(e => toPdu(e)),
             state: this.timeline.currentEvents.filter(e => e.event_id !== event.event_id).map(e => toPdu(e)),
 

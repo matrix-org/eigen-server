@@ -285,13 +285,13 @@ export class IDMimiLinearized02 implements RoomVersion {
         // Validate the auth events
         // const expectedAuthEvents = this.selectAuthEvents(event, currentState);
         // TODO: Do we care about auth events at all??
-        // https://github.com/matrix-org/linearized-matrix/issues/23
+        // https://github.com/matrix-org/eigen-server/issues/23
 
         const createEvent = currentState.get("m.room.create", "");
         if (!createEvent) throw new Error(`${event.type}: invalid state - no room create event`);
 
         const joinRulesEv = currentState.get("m.room.join_rules", "");
-        // TODO: Verify default state - https://github.com/matrix-org/linearized-matrix/issues/7
+        // TODO: Verify default state - https://github.com/matrix-org/eigen-server/issues/7
         const joinRule = joinRulesEv?.content["join_rule"] ?? "invite";
 
         const powerLevelsEv = currentState.get("m.room.power_levels", "");
@@ -452,7 +452,7 @@ export class IDMimiLinearized02 implements RoomVersion {
                 for (const [k, v] of Object.entries(usersMap)) {
                     // TODO: Validate that key is a valid user ID properly
                     // We should be using the user ID grammar
-                    // https://github.com/matrix-org/linearized-matrix/issues/3
+                    // https://github.com/matrix-org/eigen-server/issues/3
                     if (!k.startsWith("@")) {
                         throw new Error(`${event.type}: "${k}" under "users" must be a user ID`);
                     }

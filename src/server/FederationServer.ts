@@ -45,7 +45,7 @@ export class FederationServer {
     }
 
     private async onInviteRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Handle transaction IDs - https://github.com/matrix-org/eigen-server/issues/32
         // TODO: Handle new invite logic flow (proxy send) - https://github.com/matrix-org/eigen-server/issues/33
 
@@ -102,7 +102,7 @@ export class FederationServer {
     }
 
     private async onTransactionRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
 
         const events = req.body["pdus"];
         if (!Array.isArray(events)) {
@@ -147,7 +147,7 @@ export class FederationServer {
     }
 
     private async onMakeJoinRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Check that server could own the requesting user too
 
         let supportsVersions = req.query["ver"];
@@ -182,7 +182,7 @@ export class FederationServer {
     }
 
     private async onSendJoinRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Check that server could own the requesting user too
         // TODO: Handle transaction IDs - https://github.com/matrix-org/eigen-server/issues/32
 
@@ -229,7 +229,7 @@ export class FederationServer {
     }
 
     private async onEventAuthRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Check that server can receive this event.
 
         console.log(`Received event_auth request for ${req.params["roomId"]} for ${req.params["eventId"]}`);
@@ -264,7 +264,7 @@ export class FederationServer {
     }
 
     private async onQueryProfile(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
 
         // TODO Actually calculate if the user exists / support user profiles.
         // @ts-ignore
@@ -287,7 +287,7 @@ export class FederationServer {
     }
 
     private async onEventRequestTxn(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
 
         const event = this.getEvent(req.params["eventId"]);
@@ -304,7 +304,7 @@ export class FederationServer {
     }
 
     private async onEventRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
 
         const event = this.getEvent(req.params["eventId"]);
@@ -337,7 +337,7 @@ export class FederationServer {
     }
 
     private async onRoomStateRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
 
         const ret = this.getRoomState(req.params["roomId"]);
@@ -353,7 +353,7 @@ export class FederationServer {
     }
 
     private async onRoomStateIdsRequest(req: express.Request, res: express.Response) {
-        // TODO: Validate auth header - https://github.com/matrix-org/linearized-matrix/issues/17
+        // TODO: Validate auth header - https://github.com/matrix-org/eigen-server/issues/17
         // TODO: Check that server can receive this event - https://github.com/matrix-org/eigen-server/issues/21
 
         const ret = this.getRoomState(req.params["roomId"]);

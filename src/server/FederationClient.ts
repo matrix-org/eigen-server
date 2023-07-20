@@ -26,8 +26,8 @@ export class FederationClient {
         valid_until_ts: number;
         verify_keys: Record<string, {key: string}>;
     }> {
-        // TODO: Support https properly - https://github.com/matrix-org/linearized-matrix/issues/14
-        // TODO: Handle http errors - https://github.com/matrix-org/linearized-matrix/issues/15
+        // TODO: Support https properly - https://github.com/matrix-org/eigen-server/issues/14
+        // TODO: Handle http errors - https://github.com/matrix-org/eigen-server/issues/15
         return await (await fetch(`${(await this.getUrl()).httpsUrl}/_matrix/key/v2/server`)).json();
     }
 
@@ -178,7 +178,7 @@ export class FederationClient {
         const finalEvent = json["event"] ?? event;
         const stateBefore = json["state"];
         // TODO: We assume stateBefore is ordered
-        // https://github.com/matrix-org/linearized-matrix/issues/27
+        // https://github.com/matrix-org/eigen-server/issues/27
         return [stateBefore, finalEvent];
     }
 
