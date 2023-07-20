@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="dev:client (@P:3001) (nobuild)" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="dev:client:nobuild" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="ES_HOSTNAME" value="host.docker.internal" />
+      <env name="ES_PORT" value="3001" />
+      <env name="ES_LOCALPART" value="user" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

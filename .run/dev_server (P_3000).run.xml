@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="dev:server (P:3000)" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="dev:server" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="ES_HOSTNAME" value="host.docker.internal" />
+      <env name="ES_PORT" value="3000" />
+      <env name="ES_SIGNING_KEY_PATH" value="./port3000.signing.key" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>
