@@ -13,6 +13,7 @@ import {
     SendPacket,
 } from "../server/client_server_api/packets";
 import * as sourceMapSupport from "source-map-support";
+import * as dmlsWasm from "@matrix-org/matrix-dmls-wasm"; // TODO: Use this import
 
 sourceMapSupport.install();
 
