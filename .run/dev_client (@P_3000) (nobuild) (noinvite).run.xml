@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="dev:client (@P:3000) (nobuild) (noinvite)" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="dev:client:nobuild" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="ES_HOSTNAME" value="localhost" />
+      <env name="ES_LOCALPART" value="user" />
+      <env name="ES_PORT" value="3000" />
+      <env name="ES_CREATE_ROOM" value="true" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>
