@@ -8,7 +8,7 @@
     <node-interpreter value="project" />
     <envs>
       <env name="ES_CREATE_ROOM" value="true" />
-      <env name="ES_HOSTNAME" value="host.docker.internal" />
+      <env name="ES_HOSTNAME" value="localhost" />
       <env name="ES_LOCALPART" value="user" />
       <env name="ES_PORT" value="3000" />
       <env name="ES_SEND_INVITE" value="@user:host.docker.internal:3001" />
