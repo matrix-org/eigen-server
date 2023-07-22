@@ -17,14 +17,21 @@ export function calculateContentHash(
     const signatures = clone["signatures"];
     delete clone["signatures"];
 
-    // If there's an lpdu field under hashes, keep it.
+    // If this is a PDU...
+    if (clone["auth_events"]?.length > 0) {
+        // ...keep the lpdu field under hashes, if it exists.
     if (clone["hashes"]?.["lpdu"]?.["sha256"]?.length > 0) {
         clone["hashes"] = {
             lpdu: {
                 sha256: clone["hashes"]["lpdu"]["sha256"],
             },
         };
+        } else {
+            // Just delete "hashes"
+            delete clone["hashes"];
+        }
     } else {
+        // This is an LPDU.
         delete clone["hashes"];
     }
 
