@@ -1,25 +1,16 @@
 import WebSocket from "ws";
 import express, {Express} from "express";
 import crypto from "crypto";
-import {
-    DumpRoomInfoPacket,
-    ErrorPacket,
-    EventPacket,
-    InvitePacket,
-    JoinPacket,
-    LoginPacket,
-    Packet,
-    PacketType,
-    RoomInvitedPacket,
-    RoomJoinedPacket,
-    SendPacket,
-} from "./packets";
+import {DSRequestPacket, DSResponsePacket, LoginPacket, Packet, PacketType} from "./packets";
 import expressWs from "express-ws";
 import {RoomStore} from "../RoomStore";
 import {MatrixEvent, PDU} from "../models/event";
 import {InviteStore} from "../InviteStore";
 import {ParticipantRoom} from "../models/room/ParticipantRoom";
 import {HubRoom} from "../models/room/HubRoom";
+import {CreateGroupBody, CreateGroupResponse, DSResponse} from "./MIMIDSProtocol";
+import {tryAddRoom} from "../ds/store";
+import {DSRoom} from "../ds/room";
 
 interface ChatClient {
     ws: WebSocket;
@@ -79,22 +70,15 @@ export class ClientServerApi {
             });
             console.log(`${client.userId} connected`);
             this.clients.push(client);
-            this.sendToClient(client, {userId: client.userId, type: PacketType.Login} as LoginPacket);
+            // TODO: @TR: Proper multi-device
+            this.sendToClient(client, {deviceId: "ABCD", userId: client.userId, type: PacketType.Login} as LoginPacket);
             ws.on("message", data => {
                 // console.log(`${client.userId} | ${data}`);
                 const packet = JSON.parse(data as unknown as string) as Packet;
                 console.log(`${client.userId} | ${JSON.stringify(packet)}`);
                 switch (packet.type) {
-                    case PacketType.CreateRoom:
-                        return this.userCreateRoom(client);
-                    case PacketType.Join:
-                        return this.userJoinRoom(client, packet as JoinPacket);
-                    case PacketType.Invite:
-                        return this.userInviteRoom(client, packet as InvitePacket);
-                    case PacketType.Send:
-                        return this.userSend(client, packet as SendPacket);
-                    case PacketType.DumpRoomInfo:
-                        return this.userWantsRoomDump(client, packet as DumpRoomInfoPacket);
+                    case PacketType.DSRequest:
+                        return this.userDSRequest(client, packet as DSRequestPacket);
                 }
             });
         });
@@ -117,123 +101,25 @@ export class ClientServerApi {
     }
 
     private sendEventToClient(client: ChatClient, event: MatrixEvent, raw = false) {
-        if (event.type === "m.room.member" && !raw) {
-            const membership = event.content["membership"];
-            if (membership === "join") {
-                this.sendToClient(client, {
-                    type: PacketType.RoomJoined,
-                    roomId: event.room_id,
-                    targetUserId: event.state_key,
-                } as RoomJoinedPacket);
-                return; // skip remaining processing
-            } else if (membership === "invite") {
-                this.sendToClient(client, {
-                    type: PacketType.RoomInvited,
-                    roomId: event.room_id,
-                    targetUserId: event.state_key,
-                } as RoomInvitedPacket);
-                return; // skip remaining processing
-            }
-        }
-        this.sendToClient(client, {type: PacketType.Event, event: event, rawFormat: raw} as EventPacket);
-    }
-
-    private async userCreateRoom(client: ChatClient) {
-        const room = await this.roomStore.createRoom(client.userId);
-        console.log(`${client.userId} | Room created: ${room.roomId}`);
-        this.sendEventsToClients(room, room.orderedEvents);
-    }
-
-    private async userJoinRoom(client: ChatClient, packet: JoinPacket) {
-        const room = this.roomStore.getRoom(packet.targetRoomId);
-        try {
-            if (!room) {
-                await this.inviteStore.acceptInvite(packet.targetRoomId, client.userId);
-            } else {
-                await room.doJoin(client.userId);
-            }
-        } catch (e) {
-            console.error(e);
-            this.sendToClient(client, {
-                type: PacketType.Error,
-                message: "Unknown room",
-                originalPacket: packet,
-            } as ErrorPacket);
-        }
-    }
-
-    private async userInviteRoom(client: ChatClient, packet: InvitePacket) {
-        const room = this.roomStore.getRoom(packet.targetRoomId);
-        if (!room) {
-            this.sendToClient(client, {
-                type: PacketType.Error,
-                message: "Unknown room",
-                originalPacket: packet,
-            } as ErrorPacket);
-        } else {
-            try {
-                await room.doInvite(client.userId, packet.targetUserId);
-            } catch (e) {
-                console.error(e);
-                this.sendToClient(client, {
-                    type: PacketType.Error,
-                    message: (e as Error)?.message ?? "Unknown error",
-                    originalPacket: packet,
-                } as ErrorPacket);
-            }
-        }
-    }
-
-    private async userSend(client: ChatClient, packet: SendPacket) {
-        const room = this.roomStore.getRoom(packet.roomId);
-        if (!room) {
-            this.sendToClient(client, {
-                type: PacketType.Error,
-                message: "Unknown room",
-                originalPacket: packet,
-            } as ErrorPacket);
-        } else {
-            try {
-                await room.sendEvent(
-                    room.createEvent({
-                        type: packet.eventType,
-                        state_key: packet.stateKey,
-                        sender: client.userId,
-                        content: packet.content,
-                    }),
-                );
-            } catch (e) {
-                console.error(e);
-                this.sendToClient(client, {
-                    type: PacketType.Error,
-                    message: (e as Error)?.message ?? "Unknown error",
-                    originalPacket: packet,
-                } as ErrorPacket);
-            }
-        }
-    }
-
-    private async userWantsRoomDump(client: ChatClient, packet: DumpRoomInfoPacket) {
-        const room = this.roomStore.getRoom(packet.roomId);
-        if (!room) {
-            this.sendToClient(client, {
-                type: PacketType.Error,
-                message: "Unknown room",
-                originalPacket: packet,
-            } as ErrorPacket);
-        } else {
-            if (room instanceof HubRoom) {
-                for (const event of room.orderedEvents) {
-                    this.sendEventToClient(client, event, true);
-                }
-            } else {
-                this.sendToClient(client, {
-                    type: PacketType.Error,
-                    message: "Room is not a HubRoom and cannot be introspected",
-                    originalPacket: packet,
-                } as ErrorPacket);
-            }
-        }
+        // if (event.type === "m.room.member" && !raw) {
+        //     const membership = event.content["membership"];
+        //     if (membership === "join") {
+        //         this.sendToClient(client, {
+        //             type: PacketType.RoomJoined,
+        //             roomId: event.room_id,
+        //             targetUserId: event.state_key,
+        //         } as RoomJoinedPacket);
+        //         return; // skip remaining processing
+        //     } else if (membership === "invite") {
+        //         this.sendToClient(client, {
+        //             type: PacketType.RoomInvited,
+        //             roomId: event.room_id,
+        //             targetUserId: event.state_key,
+        //         } as RoomInvitedPacket);
+        //         return; // skip remaining processing
+        //     }
+        // }
+        // this.sendToClient(client, {type: PacketType.Event, event: event, rawFormat: raw} as EventPacket);
     }
 
     private async userWantsRoomDumpHttp(req: express.Request, res: express.Response) {
@@ -250,5 +136,40 @@ export class ClientServerApi {
                     .json({errcode: "M_UNKNOWN", error: "Room is not a HubRoom and cannot be introspected"});
             }
         }
+    }
+
+    private async userDSRequest(client: ChatClient, packet: DSRequestPacket) {
+        let waitPromise: Promise<DSResponse> | undefined;
+        switch (packet.requestBody.type) {
+            case "create_group":
+                waitPromise = this.userDSCreateGroup(client, packet.requestBody as CreateGroupBody);
+                break;
+            default:
+                console.log("Unknown DS request");
+                return;
+        }
+
+        if (waitPromise) {
+            const resp = await waitPromise;
+            this.sendToClient(client, <DSResponsePacket>{
+                type: PacketType.DSResponse,
+                requestId: packet.requestId,
+                responseBody: resp,
+            });
+        }
+    }
+
+    private async userDSCreateGroup(client: ChatClient, body: CreateGroupBody): Promise<CreateGroupResponse> {
+        let dsRoom: DSRoom;
+        try {
+            dsRoom = tryAddRoom(body.groupId);
+        } catch (e) {
+            console.error(e);
+            return {error: "invalid_group_id"};
+        }
+
+        dsRoom.mlsPublicState = body.groupInfo;
+        const memberUserIds = dsRoom.getMemberUserIds();
+        if (memberUserIds)
     }
 }

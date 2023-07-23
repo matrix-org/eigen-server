@@ -1,16 +1,9 @@
-import {ClientFriendlyMatrixEvent} from "../models/event";
+import {DSProtocolVersion, DSRequestBody, DSResponse} from "./MIMIDSProtocol";
 
 export enum PacketType {
     Login, // Server -> Client
-    CreateRoom, // Client -> Server
-    RoomJoined, // Server -> Client
-    Invite, // Client -> Server
-    RoomInvited, // Server -> Client
-    Join, // Client -> Server
-    Error, // Either direction
-    Send, // Client -> Server
-    Event, // Server -> Client
-    DumpRoomInfo, // Client -> Server
+    DSRequest, // Client -> Server
+    DSResponse, // Server -> Client
 }
 
 export interface Packet {
@@ -20,52 +13,25 @@ export interface Packet {
 export interface LoginPacket extends Packet {
     type: PacketType.Login;
     userId: string;
+    deviceId: string;
 }
 
-export interface RoomJoinedPacket extends Packet {
-    type: PacketType.RoomJoined;
-    roomId: string;
-    targetUserId: string;
+export interface DSRequestPacket extends Packet {
+    type: PacketType.DSRequest;
+    requestId: string; // not part of the I-D, but needed for sequencing
+
+    groupId: string; // aka room ID
+
+    requestBody: DSRequestBody;
+    protocolVersion: DSProtocolVersion;
+
+    // authData is a ClientSignatureTBS, using JSON
+    // Unpadded base64 when defined, anonymous (no auth) when undefined.
+    authData: string | undefined;
 }
 
-export interface InvitePacket extends Packet {
-    type: PacketType.Invite;
-    targetUserId: string;
-    targetRoomId: string;
-}
-
-export interface RoomInvitedPacket extends Packet {
-    type: PacketType.RoomInvited;
-    roomId: string;
-    targetUserId: string;
-}
-
-export interface JoinPacket extends Packet {
-    type: PacketType.Join;
-    targetRoomId: string;
-}
-
-export interface ErrorPacket extends Packet {
-    type: PacketType.Error;
-    message: string;
-    originalPacket: Packet;
-}
-
-export interface SendPacket extends Packet {
-    type: PacketType.Send;
-    roomId: string;
-    eventType: string;
-    stateKey?: string;
-    content: any;
-}
-
-export interface EventPacket extends Packet {
-    type: PacketType.Event;
-    event: ClientFriendlyMatrixEvent;
-    rawFormat: boolean;
-}
-
-export interface DumpRoomInfoPacket extends Packet {
-    type: PacketType.DumpRoomInfo;
-    roomId: string;
+export interface DSResponsePacket extends Packet {
+    type: PacketType.DSResponse;
+    requestId: string; // not part of I-D, needed for sequencing
+    responseBody: DSResponse;
 }
