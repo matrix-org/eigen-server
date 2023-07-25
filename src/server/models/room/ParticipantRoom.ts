@@ -112,12 +112,16 @@ export class ParticipantRoom implements Room {
             throw new Error("Runtime error: Override issue - not receiving events in a HubRoom");
         }
 
+        // Check the event is valid.
+        // @ts-ignore
+        await this.roomVersion.checkValidity(event, this.keyStore);
+
         // otherwise it should be a PDU
         const fullEvent: MatrixEvent = {
             ...(event as PDU),
             event_id: `$${calculateReferenceHash(this.roomVersion.redact(event))}`,
         };
-        await this.timeline.insertEvents([fullEvent]);
+        await this.timeline.insertEvents([fullEvent]); // checks auth internally
     }
 
     public getEvent(eventId: string): MatrixEvent | undefined {
