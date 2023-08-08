@@ -107,17 +107,20 @@ export class ParticipantRoom implements Room {
         return new FederationClient(this.hubDomain).sendLinearizedPdus([event]);
     }
 
-    public async receiveEvent(event: PDU | LinearizedPDU): Promise<void> {
+    public async receiveEvent(event: PDU): Promise<void> {
         if (this.hubDomain === Runtime.signingKey.serverName) {
             throw new Error("Runtime error: Override issue - not receiving events in a HubRoom");
         }
+
+        // Check the event is valid.
+        await this.roomVersion.checkValidity(event, this.keyStore);
 
         // otherwise it should be a PDU
         const fullEvent: MatrixEvent = {
             ...(event as PDU),
             event_id: `$${calculateReferenceHash(this.roomVersion.redact(event))}`,
         };
-        await this.timeline.insertEvents([fullEvent]);
+        await this.timeline.insertEvents([fullEvent]); // checks auth internally
     }
 
     public getEvent(eventId: string): MatrixEvent | undefined {
